@@ -1,26 +1,31 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
+import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
 import { Card } from '@/shared/ui/card'
 
-const signupSchema = z
-  .object({
-    nickname: z.string().min(2, '닉네임은 2자 이상이어야 합니다.'),
-    email: z.email('유효한 이메일을 입력하세요.'),
-    password: z.string().min(8, '비밀번호는 8자 이상이어야 합니다.'),
-    confirmPassword: z.string().min(8, '비밀번호를 다시 입력하세요.'),
-  })
-  .refine((value) => value.password === value.confirmPassword, {
-    message: '비밀번호가 일치하지 않습니다.',
-    path: ['confirmPassword'],
-  })
+const createSignupSchema = (t: TFunction) =>
+  z
+    .object({
+      nickname: z.string().min(2, t('form:errors.nicknameMin')),
+      email: z.email(t('form:errors.invalidEmail')),
+      password: z.string().min(8, t('form:errors.passwordMin')),
+      confirmPassword: z
+        .string()
+        .min(8, t('form:errors.confirmPasswordRequired')),
+    })
+    .refine((value) => value.password === value.confirmPassword, {
+      message: t('form:errors.passwordMismatch'),
+      path: ['confirmPassword'],
+    })
 
-type SignupFormValues = z.infer<typeof signupSchema>
+type SignupFormValues = z.infer<ReturnType<typeof createSignupSchema>>
 
 export function SignupPage() {
   const { t } = useTranslation()
+  const signupSchema = createSignupSchema(t)
   const {
     register,
     handleSubmit,
@@ -43,17 +48,17 @@ export function SignupPage() {
 
   return (
     <Card
-      title={t('signup.title')}
-      description={t('signup.description')}
+      title={t('auth:signup.title')}
+      description={t('auth:signup.description')}
       className="mx-auto max-w-xl"
     >
       <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
         <label className="grid gap-2">
-          <span className="text-sm font-medium">{t('form.nickname')}</span>
+          <span className="text-sm font-medium">{t('form:nickname')}</span>
           <input
             {...register('nickname')}
             className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3 outline-none transition focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--ring)]"
-            placeholder={t('form.nicknamePlaceholder')}
+            placeholder={t('form:nicknamePlaceholder')}
           />
           {errors.nickname ? (
             <span className="text-sm text-red-500">
@@ -63,7 +68,7 @@ export function SignupPage() {
         </label>
 
         <label className="grid gap-2">
-          <span className="text-sm font-medium">{t('form.email')}</span>
+          <span className="text-sm font-medium">{t('form:email')}</span>
           <input
             {...register('email')}
             className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3 outline-none transition focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--ring)]"
@@ -76,7 +81,7 @@ export function SignupPage() {
         </label>
 
         <label className="grid gap-2">
-          <span className="text-sm font-medium">{t('form.password')}</span>
+          <span className="text-sm font-medium">{t('form:password')}</span>
           <input
             {...register('password')}
             className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3 outline-none transition focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--ring)]"
@@ -92,7 +97,7 @@ export function SignupPage() {
 
         <label className="grid gap-2">
           <span className="text-sm font-medium">
-            {t('form.confirmPassword')}
+            {t('form:confirmPassword')}
           </span>
           <input
             {...register('confirmPassword')}
@@ -112,7 +117,7 @@ export function SignupPage() {
           disabled={!isValid || isSubmitting}
           type="submit"
         >
-          {isSubmitting ? t('common.loading') : t('common.createAccount')}
+          {isSubmitting ? t('common:loading') : t('common:createAccount')}
         </button>
       </form>
     </Card>

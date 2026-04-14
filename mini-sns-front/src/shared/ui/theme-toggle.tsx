@@ -21,7 +21,7 @@ export function ThemeToggle() {
             : 'border-orange-200 bg-[var(--accent)] shadow-[0_0_0_4px_rgba(242,158,97,0.18)]',
         ].join(' ')}
       />
-      <span>{theme === 'light' ? t('common.darkMode') : t('common.lightMode')}</span>
+      <span>{theme === 'light' ? t('common:darkMode') : t('common:lightMode')}</span>
     </button>
   )
 }

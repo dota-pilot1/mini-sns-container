@@ -25,19 +25,19 @@ export function AppShell({ children }: PropsWithChildren) {
             <Link to="/" className="text-lg font-semibold tracking-[-0.04em]">
               mini-sns-front
             </Link>
-            <p className="text-sm text-[var(--muted)]">{t('common.tagline')}</p>
+            <p className="text-sm text-[var(--muted)]">{t('common:tagline')}</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <div className="inline-flex rounded-full border border-[var(--border)] bg-[var(--control)] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
               <NavLink active={pathname === '/'} to="/">
-                {t('nav.home')}
+                {t('nav:home')}
               </NavLink>
               <NavLink active={pathname === '/login'} to="/login">
-                {t('nav.login')}
+                {t('nav:login')}
               </NavLink>
               <NavLink active={pathname === '/signup'} to="/signup">
-                {t('nav.signup')}
+                {t('nav:signup')}
               </NavLink>
             </div>
 

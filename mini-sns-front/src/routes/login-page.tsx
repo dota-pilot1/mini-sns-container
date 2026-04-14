@@ -1,19 +1,22 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
+import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
 import { Card } from '@/shared/ui/card'
 
-const loginSchema = z.object({
-  email: z.email('유효한 이메일을 입력하세요.'),
-  password: z.string().min(8, '비밀번호는 8자 이상이어야 합니다.'),
-})
+const createLoginSchema = (t: TFunction) =>
+  z.object({
+    email: z.email(t('form:errors.invalidEmail')),
+    password: z.string().min(8, t('form:errors.passwordMin')),
+  })
 
-type LoginFormValues = z.infer<typeof loginSchema>
+type LoginFormValues = z.infer<ReturnType<typeof createLoginSchema>>
 
 export function LoginPage() {
   const { t } = useTranslation()
+  const loginSchema = createLoginSchema(t)
   const {
     register,
     handleSubmit,
@@ -34,13 +37,13 @@ export function LoginPage() {
 
   return (
     <Card
-      title={t('login.title')}
-      description={t('login.description')}
+      title={t('auth:login.title')}
+      description={t('auth:login.description')}
       className="mx-auto max-w-xl"
     >
       <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
         <label className="grid gap-2">
-          <span className="text-sm font-medium">{t('form.email')}</span>
+          <span className="text-sm font-medium">{t('form:email')}</span>
           <input
             {...register('email')}
             className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3 outline-none transition focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--ring)]"
@@ -53,7 +56,7 @@ export function LoginPage() {
         </label>
 
         <label className="grid gap-2">
-          <span className="text-sm font-medium">{t('form.password')}</span>
+          <span className="text-sm font-medium">{t('form:password')}</span>
           <input
             {...register('password')}
             className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3 outline-none transition focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--ring)]"
@@ -72,7 +75,7 @@ export function LoginPage() {
           disabled={!isValid || isSubmitting}
           type="submit"
         >
-          {isSubmitting ? t('common.loading') : t('common.signIn')}
+          {isSubmitting ? t('common:loading') : t('common:signIn')}
         </button>
       </form>
     </Card>
