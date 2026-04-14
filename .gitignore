@@ -1,0 +1,23 @@
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Node
+node_modules/
+dist/
+
+# Gradle / Java
+.gradle/
+build/
+out/
+
+# Logs
+*.log
+
+# Env
+.env
+.env.*
+!.env.example
