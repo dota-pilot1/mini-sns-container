@@ -1,8 +1,8 @@
-# fs-admin-container
+# stay-ops-container
 
 기준정보 관리와 운영 조회를 중심으로 연습하는 관리자형 풀스택 프로젝트 저장소입니다.
 
-`fs-admin-container`는 서비스형 SNS가 아니라, 상품/카테고리/매장/채널/매핑 같은 기준정보와 운영용 조회 화면을 다루는 백오피스 성격의 프로젝트를 목표로 합니다.
+`stay-ops-container`는 거주 운영, 생활 서비스, 공지/문의 관리 같은 운영용 조회 화면을 다루는 백오피스 성격의 프로젝트를 목표로 합니다.
 
 ## 프로젝트 방향
 
@@ -19,13 +19,13 @@
 ## 저장소 구조
 
 ```text
-fs-admin-container
-├── fs-admin-server
-├── fs-admin-front
+stay-ops-container
+├── stay-ops-server
+├── stay-ops-front
 └── docs-for-todo
 ```
 
-### `fs-admin-server`
+### `stay-ops-server`
 
 Spring Boot 기반 관리자 백엔드입니다.
 
@@ -47,9 +47,9 @@ Spring Boot 기반 관리자 백엔드입니다.
 - Actuator
 
 문서:
-- [fs-admin-server README](/Users/terecal/fs-admin-container/fs-admin-server/README.md)
+- [stay-ops-server README](/Users/terecal/stay-ops-container/stay-ops-server/README.md)
 
-### `fs-admin-front`
+### `stay-ops-front`
 
 Vite 기반 관리자 프론트엔드입니다.
 
@@ -77,14 +77,14 @@ Vite 기반 관리자 프론트엔드입니다.
 - Tailwind CSS
 
 문서:
-- [fs-admin-front README](/Users/terecal/fs-admin-container/fs-admin-front/README.md)
+- [stay-ops-front README](/Users/terecal/stay-ops-container/stay-ops-front/README.md)
 
 ## 빠른 실행
 
 ### 1. 백엔드 실행
 
 ```bash
-cd fs-admin-server
+cd stay-ops-server
 docker compose up -d
 ./gradlew bootRun
 ```
@@ -98,7 +98,7 @@ curl http://localhost:8080/actuator/health
 ### 2. 프론트 실행
 
 ```bash
-cd fs-admin-front
+cd stay-ops-front
 pnpm install
 pnpm dev
 ```
@@ -112,7 +112,7 @@ pnpm dev
 구현만 하지 않고 설계 의도와 작업 우선순위를 함께 관리합니다.
 
 문서 위치:
-- [todo 문서](/Users/terecal/fs-admin-container/docs-for-todo/todo.md)
+- [todo 문서](/Users/terecal/stay-ops-container/docs-for-todo/todo.md)
 
 각 문서는 아래 관점으로 정리합니다.
 - 도메인 범위
