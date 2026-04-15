@@ -23,7 +23,7 @@ export function AppShell({ children }: PropsWithChildren) {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="grid gap-1">
             <Link to="/" className="text-lg font-semibold tracking-[-0.04em]">
-              stay-ops-front
+              Stay Ops
             </Link>
             <p className="text-sm text-[var(--muted)]">{t('common:tagline')}</p>
           </div>
