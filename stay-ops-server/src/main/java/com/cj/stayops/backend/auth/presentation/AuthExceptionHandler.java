@@ -8,6 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import com.cj.stayops.backend.auth.domain.exception.InvalidCredentialsException;
 import com.cj.stayops.backend.auth.domain.exception.WeakPasswordException;
 import com.cj.stayops.backend.auth.presentation.dto.ErrorResponse;
 import com.cj.stayops.backend.user.domain.exception.DuplicateEmailException;
@@ -53,5 +54,13 @@ public class AuthExceptionHandler {
 	public ResponseEntity<ErrorResponse> handleWeakPassword(WeakPasswordException e) {
 		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
 			.body(ErrorResponse.of("WEAK_PASSWORD", e.getMessage()));
+	}
+
+	/** 로그인 자격 증명 실패 → 401 Unauthorized. */
+	@ExceptionHandler(InvalidCredentialsException.class)
+	public ResponseEntity<ErrorResponse> handleInvalidCredentials(InvalidCredentialsException e) {
+		// e.getMessage() 는 디버깅용. 사용자에게는 일관된 메시지 반환 (계정 enumeration 방지).
+		return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+			.body(ErrorResponse.of("INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않습니다."));
 	}
 }

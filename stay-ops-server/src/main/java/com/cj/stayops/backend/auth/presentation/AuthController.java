@@ -7,9 +7,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.cj.stayops.backend.auth.application.LoginUseCase;
 import com.cj.stayops.backend.auth.application.SignupUseCase;
+import com.cj.stayops.backend.auth.application.dto.LoginResult;
 import com.cj.stayops.backend.auth.application.dto.SignupResult;
 import com.cj.stayops.backend.auth.presentation.dto.ErrorResponse;
+import com.cj.stayops.backend.auth.presentation.dto.LoginRequest;
+import com.cj.stayops.backend.auth.presentation.dto.LoginResponse;
 import com.cj.stayops.backend.auth.presentation.dto.SignupRequest;
 import com.cj.stayops.backend.auth.presentation.dto.SignupResponse;
 
@@ -32,9 +36,11 @@ import jakarta.validation.Valid;
 public class AuthController {
 
 	private final SignupUseCase signupUseCase;
+	private final LoginUseCase loginUseCase;
 
-	public AuthController(SignupUseCase signupUseCase) {
+	public AuthController(SignupUseCase signupUseCase, LoginUseCase loginUseCase) {
 		this.signupUseCase = signupUseCase;
+		this.loginUseCase = loginUseCase;
 	}
 
 	@PostMapping("/signup")
@@ -62,5 +68,32 @@ public class AuthController {
 	public ResponseEntity<SignupResponse> signup(@Valid @RequestBody SignupRequest request) {
 		SignupResult result = signupUseCase.execute(request.toCommand());
 		return ResponseEntity.status(HttpStatus.CREATED).body(SignupResponse.from(result));
+	}
+
+	@PostMapping("/login")
+	@Operation(
+		summary = "로그인",
+		description = "이메일/비밀번호로 JWT Access Token 을 발급합니다."
+	)
+	@ApiResponses({
+		@ApiResponse(
+			responseCode = "200",
+			description = "로그인 성공",
+			content = @Content(schema = @Schema(implementation = LoginResponse.class))
+		),
+		@ApiResponse(
+			responseCode = "400",
+			description = "형식 오류 (VALIDATION_FAILED / INVALID_EMAIL)",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+		),
+		@ApiResponse(
+			responseCode = "401",
+			description = "자격 증명 실패 (INVALID_CREDENTIALS)",
+			content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+		)
+	})
+	public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+		LoginResult result = loginUseCase.execute(request.toCommand());
+		return ResponseEntity.ok(LoginResponse.from(result));
 	}
 }
