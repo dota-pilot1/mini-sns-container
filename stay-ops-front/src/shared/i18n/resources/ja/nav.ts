@@ -1,5 +1,5 @@
 export const nav = {
   home: 'ホーム',
   login: 'ログイン',
-  signup: '申請',
+  signup: '新規登録',
 }

@@ -1,10 +1,10 @@
 export const auth = {
   login: {
-    title: 'Admin Login',
-    description: 'This login form is ready for operator authentication and role-based access flows.',
+    title: 'Sign In',
+    description: 'Sign in with your email and password.',
   },
   signup: {
-    title: 'Admin Access Request',
-    description: 'This form can grow into an initial admin bootstrap or operator approval flow.',
+    title: 'Sign Up',
+    description: 'Create a new account with email, password, and name.',
   },
 }

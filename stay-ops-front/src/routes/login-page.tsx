@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
 import { Card } from '@/shared/ui/card'
+import { PasswordInput } from '@/shared/ui/password-input'
 
 const createLoginSchema = (t: TFunction) =>
   z.object({
@@ -57,11 +58,9 @@ export function LoginPage() {
 
         <label className="grid gap-2">
           <span className="text-sm font-medium">{t('form:password')}</span>
-          <input
+          <PasswordInput
             {...register('password')}
-            className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3 outline-none transition focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--ring)]"
             placeholder="********"
-            type="password"
           />
           {errors.password ? (
             <span className="text-sm text-red-500">

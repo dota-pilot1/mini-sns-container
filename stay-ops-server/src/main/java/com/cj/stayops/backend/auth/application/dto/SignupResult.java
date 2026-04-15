@@ -2,7 +2,7 @@ package com.cj.stayops.backend.auth.application.dto;
 
 import java.time.Instant;
 
-import com.cj.stayops.backend.auth.domain.model.User;
+import com.cj.stayops.backend.user.domain.model.User;
 
 /**
  * 회원가입 유스케이스 출력 DTO.

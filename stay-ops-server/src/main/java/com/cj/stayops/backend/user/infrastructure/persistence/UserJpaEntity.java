@@ -1,4 +1,4 @@
-package com.cj.stayops.backend.auth.infrastructure.persistence;
+package com.cj.stayops.backend.user.infrastructure.persistence;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -11,7 +11,7 @@ import jakarta.persistence.Table;
 /**
  * User Aggregate의 JPA 영속화 전용 엔티티.
  * <p>
- * 도메인 {@link com.cj.stayops.backend.auth.domain.model.User}와 분리되어 있어
+ * 도메인 {@link com.cj.stayops.backend.user.domain.model.User}와 분리되어 있어
  * JPA 제약(기본 생성자, setter 등)이 도메인에 새어나가지 않는다.
  */
 @Entity

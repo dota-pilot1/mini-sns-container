@@ -8,18 +8,19 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import com.cj.stayops.backend.auth.domain.exception.DuplicateEmailException;
-import com.cj.stayops.backend.auth.domain.exception.InvalidEmailException;
 import com.cj.stayops.backend.auth.domain.exception.WeakPasswordException;
 import com.cj.stayops.backend.auth.presentation.dto.ErrorResponse;
+import com.cj.stayops.backend.user.domain.exception.DuplicateEmailException;
+import com.cj.stayops.backend.user.domain.exception.InvalidEmailException;
 
 /**
- * Auth 모듈 전용 예외 핸들러 (basePackages로 스코프 제한).
+ * 전역 예외 핸들러.
  * <p>
- * TODO: 전역 에러 처리 도입 시 {@code shared/presentation/GlobalExceptionHandler}로 승격.
- * 지금은 auth 도메인 예외만 처리.
+ * auth/user 도메인 예외 + Bean Validation 실패를 일괄 처리한다.
+ * 현재는 auth 패키지에 위치하지만, 도메인이 늘어나면
+ * {@code shared/presentation/GlobalExceptionHandler}로 승격할 수 있다.
  */
-@RestControllerAdvice(basePackages = "com.cj.stayops.backend.auth.presentation")
+@RestControllerAdvice
 public class AuthExceptionHandler {
 
 	/** Bean Validation 실패 (@Valid 통과 못함). */

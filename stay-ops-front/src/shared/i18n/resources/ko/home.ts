@@ -7,11 +7,11 @@ export const home = {
   cards: {
     router: {
       title: 'Router Ready',
-      description: '홈, 로그인, 계정 요청 라우트를 TanStack Router로 구성했습니다.',
+      description: '홈, 로그인, 회원 가입 라우트를 TanStack Router로 구성했습니다.',
     },
     form: {
       title: 'Form Ready',
-      description: '로그인과 계정 요청 화면에 react-hook-form + zod 검증 예제를 넣었습니다.',
+      description: '로그인과 회원 가입 화면에 react-hook-form + zod 검증 예제를 넣었습니다.',
     },
     theme: {
       title: 'Theme & i18n',

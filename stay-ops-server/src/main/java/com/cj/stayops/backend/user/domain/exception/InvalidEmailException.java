@@ -1,4 +1,4 @@
-package com.cj.stayops.backend.auth.domain.exception;
+package com.cj.stayops.backend.user.domain.exception;
 
 /**
  * Email Value Object 생성 시 형식이 잘못되었을 때 발생.

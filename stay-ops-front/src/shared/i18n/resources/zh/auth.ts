@@ -1,10 +1,10 @@
 export const auth = {
   login: {
-    title: '管理员登录',
-    description: '该表单可直接扩展为运营账号认证与权限控制流程。',
+    title: '登录',
+    description: '使用邮箱和密码登录。',
   },
   signup: {
-    title: '管理员账号申请',
-    description: '该表单可扩展为初始管理员创建或运营人员审批流程。',
+    title: '注册',
+    description: '使用邮箱、密码和姓名创建新账户。',
   },
 }

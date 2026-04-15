@@ -1,15 +1,19 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useNavigate } from '@tanstack/react-router'
 import { useForm } from 'react-hook-form'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
+import { useSignup } from '@/features/auth/signup'
+import { ApiError } from '@/shared/api/types'
 import { Card } from '@/shared/ui/card'
+import { PasswordInput } from '@/shared/ui/password-input'
 
 const createSignupSchema = (t: TFunction) =>
   z
     .object({
-      nickname: z.string().min(2, t('form:errors.nicknameMin')),
+      name: z.string().min(2, t('form:errors.nameMin')),
       email: z.email(t('form:errors.invalidEmail')),
       password: z.string().min(8, t('form:errors.passwordMin')),
       confirmPassword: z
@@ -25,16 +29,21 @@ type SignupFormValues = z.infer<ReturnType<typeof createSignupSchema>>
 
 export function SignupPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
+  const signup = useSignup()
+
   const signupSchema = createSignupSchema(t)
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting, isValid },
+    setError,
+    formState: { errors, isValid },
   } = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
-    mode: 'onChange',
+    mode: 'onTouched',
+    reValidateMode: 'onChange',
     defaultValues: {
-      nickname: '',
+      name: '',
       email: '',
       password: '',
       confirmPassword: '',
@@ -42,9 +51,48 @@ export function SignupPage() {
   })
 
   const onSubmit = async (values: SignupFormValues) => {
-    await Promise.resolve(values)
-    window.alert(JSON.stringify(values, null, 2))
+    try {
+      await signup.mutateAsync({
+        email: values.email,
+        password: values.password,
+        name: values.name,
+      })
+      window.alert(t('form:submit.signupSuccess'))
+      navigate({ to: '/login' })
+    } catch (err) {
+      if (err instanceof ApiError) {
+        // 필드별 에러 먼저 매핑
+        if (err.fieldErrors.length > 0) {
+          err.fieldErrors.forEach((fe) => {
+            if (
+              fe.field === 'email' ||
+              fe.field === 'password' ||
+              fe.field === 'name'
+            ) {
+              setError(fe.field, { type: 'server', message: fe.message })
+            }
+          })
+          return
+        }
+        // 코드 기반 분기
+        if (err.code === 'DUPLICATE_EMAIL') {
+          setError('email', { type: 'server', message: err.message })
+          return
+        }
+        if (err.code === 'INVALID_EMAIL') {
+          setError('email', { type: 'server', message: err.message })
+          return
+        }
+        if (err.code === 'WEAK_PASSWORD') {
+          setError('password', { type: 'server', message: err.message })
+          return
+        }
+      }
+      window.alert(t('form:submit.signupGenericError'))
+    }
   }
+
+  const isSubmitting = signup.isPending
 
   return (
     <Card
@@ -54,16 +102,14 @@ export function SignupPage() {
     >
       <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
         <label className="grid gap-2">
-          <span className="text-sm font-medium">{t('form:nickname')}</span>
+          <span className="text-sm font-medium">{t('form:name')}</span>
           <input
-            {...register('nickname')}
+            {...register('name')}
             className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3 outline-none transition focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--ring)]"
-            placeholder={t('form:nicknamePlaceholder')}
+            placeholder={t('form:namePlaceholder')}
           />
-          {errors.nickname ? (
-            <span className="text-sm text-red-500">
-              {errors.nickname.message}
-            </span>
+          {errors.name ? (
+            <span className="text-sm text-red-500">{errors.name.message}</span>
           ) : null}
         </label>
 
@@ -72,7 +118,7 @@ export function SignupPage() {
           <input
             {...register('email')}
             className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3 outline-none transition focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--ring)]"
-            placeholder="admin@example.com"
+            placeholder="user@example.com"
             type="email"
           />
           {errors.email ? (
@@ -82,11 +128,9 @@ export function SignupPage() {
 
         <label className="grid gap-2">
           <span className="text-sm font-medium">{t('form:password')}</span>
-          <input
+          <PasswordInput
             {...register('password')}
-            className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3 outline-none transition focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--ring)]"
             placeholder="********"
-            type="password"
           />
           {errors.password ? (
             <span className="text-sm text-red-500">
@@ -99,11 +143,9 @@ export function SignupPage() {
           <span className="text-sm font-medium">
             {t('form:confirmPassword')}
           </span>
-          <input
+          <PasswordInput
             {...register('confirmPassword')}
-            className="rounded-2xl border border-[var(--border)] bg-[var(--surface-strong)] px-4 py-3 outline-none transition focus:border-[var(--accent)] focus:ring-4 focus:ring-[var(--ring)]"
             placeholder="********"
-            type="password"
           />
           {errors.confirmPassword ? (
             <span className="text-sm text-red-500">
@@ -117,7 +159,9 @@ export function SignupPage() {
           disabled={!isValid || isSubmitting}
           type="submit"
         >
-          {isSubmitting ? t('common:loading') : t('common:createAccount')}
+          {isSubmitting
+            ? t('form:submit.signupLoading')
+            : t('common:createAccount')}
         </button>
       </form>
     </Card>

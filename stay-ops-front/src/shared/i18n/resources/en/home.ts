@@ -7,11 +7,11 @@ export const home = {
   cards: {
     router: {
       title: 'Router Ready',
-      description: 'Home, login, and account request routes are configured with TanStack Router.',
+      description: 'Home, login, and sign-up routes are configured with TanStack Router.',
     },
     form: {
       title: 'Form Ready',
-      description: 'Login and account request screens already include react-hook-form and zod validation.',
+      description: 'Login and sign-up screens already include react-hook-form and zod validation.',
     },
     theme: {
       title: 'Theme & i18n',

@@ -1,9 +1,8 @@
-package com.cj.stayops.backend.auth.domain.model;
+package com.cj.stayops.backend.user.domain.model;
 
-import java.util.Objects;
 import java.util.regex.Pattern;
 
-import com.cj.stayops.backend.auth.domain.exception.InvalidEmailException;
+import com.cj.stayops.backend.user.domain.exception.InvalidEmailException;
 
 /**
  * Email Value Object.

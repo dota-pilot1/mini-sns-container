@@ -1,4 +1,4 @@
-package com.cj.stayops.backend.auth.domain.model;
+package com.cj.stayops.backend.user.domain.model;
 
 import java.time.Instant;
 import java.util.Objects;

@@ -1,7 +1,7 @@
-package com.cj.stayops.backend.auth.domain.exception;
+package com.cj.stayops.backend.user.domain.exception;
 
 /**
- * 회원가입 시 이미 존재하는 이메일로 가입 시도할 때 발생.
+ * 이미 존재하는 이메일로 User를 생성하려 할 때 발생.
  * <p>
  * Application Layer에서 UserRepository 조회 후 throw.
  */

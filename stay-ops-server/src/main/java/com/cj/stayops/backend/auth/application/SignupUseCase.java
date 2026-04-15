@@ -9,12 +9,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.cj.stayops.backend.auth.application.dto.SignupCommand;
 import com.cj.stayops.backend.auth.application.dto.SignupResult;
-import com.cj.stayops.backend.auth.domain.exception.DuplicateEmailException;
 import com.cj.stayops.backend.auth.domain.exception.WeakPasswordException;
-import com.cj.stayops.backend.auth.domain.model.Email;
-import com.cj.stayops.backend.auth.domain.model.User;
-import com.cj.stayops.backend.auth.domain.model.UserId;
-import com.cj.stayops.backend.auth.domain.repository.UserRepository;
+import com.cj.stayops.backend.user.domain.exception.DuplicateEmailException;
+import com.cj.stayops.backend.user.domain.model.Email;
+import com.cj.stayops.backend.user.domain.model.User;
+import com.cj.stayops.backend.user.domain.model.UserId;
+import com.cj.stayops.backend.user.domain.repository.UserRepository;
 
 /**
  * 회원가입 유스케이스.

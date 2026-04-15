@@ -1,13 +1,15 @@
-package com.cj.stayops.backend.auth.infrastructure.persistence;
+package com.cj.stayops.backend.user.infrastructure.persistence;
 
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
-import com.cj.stayops.backend.auth.domain.model.Email;
-import com.cj.stayops.backend.auth.domain.model.User;
-import com.cj.stayops.backend.auth.domain.model.UserId;
-import com.cj.stayops.backend.auth.domain.repository.UserRepository;
+import com.cj.stayops.backend.user.domain.model.Email;
+import com.cj.stayops.backend.user.domain.model.User;
+import com.cj.stayops.backend.user.domain.model.UserId;
+import com.cj.stayops.backend.user.domain.repository.UserRepository;
 
 /**
  * 도메인 {@link UserRepository} 계약의 JPA 기반 구현체.
@@ -43,6 +45,11 @@ public class UserRepositoryImpl implements UserRepository {
 	@Override
 	public boolean existsByEmail(Email email) {
 		return jpaRepository.existsByEmail(email.value());
+	}
+
+	@Override
+	public Page<User> findAll(Pageable pageable) {
+		return jpaRepository.findAll(pageable).map(this::toDomain);
 	}
 
 	// ---------- mapping ----------
