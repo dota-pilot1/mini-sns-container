@@ -3,11 +3,13 @@ import {
   createRoute,
   createRouter,
   Outlet,
+  redirect,
 } from '@tanstack/react-router'
 
 import { HomePage } from '@/routes/home-page'
 import { LoginPage } from '@/routes/login-page'
 import { SignupPage } from '@/routes/signup-page'
+import { useAuthStore } from '@/shared/auth/auth-store'
 import { AppShell } from '@/shared/layouts/app-shell'
 
 const rootRoute = createRootRoute({
@@ -18,9 +20,24 @@ const rootRoute = createRootRoute({
   ),
 })
 
+/**
+ * 인증 필요 라우트의 beforeLoad 가드.
+ * 토큰 없으면 /login 으로 리다이렉트, redirect 쿼리로 원래 경로 유지.
+ */
+function requireAuth({ location }: { location: { href: string } }) {
+  const token = useAuthStore.getState().accessToken
+  if (!token) {
+    throw redirect({
+      to: '/login',
+      search: { redirect: location.href },
+    })
+  }
+}
+
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
+  beforeLoad: requireAuth,
   component: HomePage,
 })
 

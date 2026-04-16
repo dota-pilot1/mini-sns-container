@@ -1,9 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useNavigate } from '@tanstack/react-router'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
+import { useLogin } from '@/features/auth/login'
+import { ApiError } from '@/shared/api/types'
 import { Card } from '@/shared/ui/card'
 import { PasswordInput } from '@/shared/ui/password-input'
 
@@ -17,7 +21,11 @@ type LoginFormValues = z.infer<ReturnType<typeof createLoginSchema>>
 
 export function LoginPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const loginSchema = createLoginSchema(t)
+  const { mutateAsync } = useLogin()
+  const [serverError, setServerError] = useState<string | null>(null)
+
   const {
     register,
     handleSubmit,
@@ -32,8 +40,20 @@ export function LoginPage() {
   })
 
   const onSubmit = async (values: LoginFormValues) => {
-    await Promise.resolve(values)
-    window.alert(JSON.stringify(values, null, 2))
+    setServerError(null)
+    try {
+      await mutateAsync({ email: values.email, password: values.password })
+      // redirect 쿼리가 있으면 그쪽으로, 없으면 홈
+      const params = new URLSearchParams(window.location.search)
+      const redirectTo = params.get('redirect') ?? '/'
+      await navigate({ to: redirectTo })
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'INVALID_CREDENTIALS') {
+        setServerError(t('auth:login.invalidCredentials'))
+      } else {
+        setServerError(t('auth:login.unknownError'))
+      }
+    }
   }
 
   return (
@@ -68,6 +88,12 @@ export function LoginPage() {
             </span>
           ) : null}
         </label>
+
+        {serverError ? (
+          <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-950/30 dark:text-red-400">
+            {serverError}
+          </p>
+        ) : null}
 
         <button
           className="mt-2 inline-flex items-center justify-center rounded-full bg-[var(--accent)] px-5 py-3 font-semibold text-white transition enabled:hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
