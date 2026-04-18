@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 
-import type { RoomResponse } from '@/features/room/api/room-api'
+import type { ContractResponse } from '@/features/contract/api/contract-api'
+import { CONTRACT_STATUS_LABEL } from '@/features/contract/model/contract-types'
+import { useTerminateContract } from '@/features/contract/model/use-terminate-contract'
 import type { TenantResponse } from '@/features/tenant/api/tenant-api'
 import { useDeleteTenant } from '@/features/tenant/model/use-delete-tenant'
 import { useUpdateTenant } from '@/features/tenant/model/use-update-tenant'
@@ -12,19 +14,29 @@ const dateFmt = new Intl.DateTimeFormat('ko-KR', {
   timeStyle: 'short',
 })
 const dateOnlyFmt = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium' })
+const numberFmt = new Intl.NumberFormat('ko-KR')
 
 type Props = {
   tenant: TenantResponse | null
-  rooms: RoomResponse[]
+  contracts: ContractResponse[]
+  roomNumberById: Record<string, string>
   onClose: () => void
 }
 
 type Mode = 'view' | 'edit'
 
-export function TenantDetailDrawer({ tenant, rooms, onClose }: Props) {
+export function TenantDetailDrawer({
+  tenant,
+  contracts,
+  roomNumberById,
+  onClose,
+}: Props) {
   const [mode, setMode] = useState<Mode>('view')
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  const moveOutMutation = useDeleteTenant()
+  const [terminateTarget, setTerminateTarget] = useState<ContractResponse | null>(null)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+
+  const terminateMutation = useTerminateContract()
+  const deleteMutation = useDeleteTenant()
   const updateMutation = useUpdateTenant()
 
   useEffect(() => {
@@ -32,28 +44,22 @@ export function TenantDetailDrawer({ tenant, rooms, onClose }: Props) {
   }, [tenant?.tenantId])
 
   useEffect(() => {
-    if (!tenant || confirmOpen || mode === 'edit') return
+    if (!tenant || terminateTarget || deleteOpen || mode === 'edit') return
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [tenant, confirmOpen, mode, onClose])
+  }, [tenant, terminateTarget, deleteOpen, mode, onClose])
 
   if (!tenant) return null
 
-  const roomNumber = tenant.roomId
-    ? rooms.find((r) => r.roomId === tenant.roomId)?.roomNumber
-    : null
+  const tenantContracts = contracts
+    .filter((c) => c.tenantId === tenant.tenantId)
+    .slice()
+    .sort((a, b) => b.startDate.localeCompare(a.startDate))
 
-  const handleMoveOut = () => {
-    moveOutMutation.mutate(tenant.tenantId, {
-      onSuccess: () => {
-        setConfirmOpen(false)
-        onClose()
-      },
-    })
-  }
+  const activeContract = tenantContracts.find((c) => c.status === 'ACTIVE') ?? null
 
   return (
     <div className="fixed inset-0 z-40">
@@ -74,17 +80,25 @@ export function TenantDetailDrawer({ tenant, rooms, onClose }: Props) {
 
         {mode === 'view' ? (
           <>
-            <InfoSection tenant={tenant} roomNumber={roomNumber ?? null} />
+            <InfoSection tenant={tenant} />
+            <ContractsSection
+              contracts={tenantContracts}
+              roomNumberById={roomNumberById}
+              onTerminate={setTerminateTarget}
+            />
             <Footer
+              activeContract={activeContract}
               onEdit={() => setMode('edit')}
-              onMoveOut={() => setConfirmOpen(true)}
+              onTerminate={() => {
+                if (activeContract) setTerminateTarget(activeContract)
+              }}
+              onDelete={() => setDeleteOpen(true)}
             />
           </>
         ) : (
           <section className="px-5 pb-5">
             <TenantForm
               initial={tenant}
-              rooms={rooms}
               submitting={updateMutation.isPending}
               submitLabel="저장"
               onCancel={() => setMode('view')}
@@ -100,14 +114,40 @@ export function TenantDetailDrawer({ tenant, rooms, onClose }: Props) {
       </aside>
 
       <ConfirmDialog
-        open={confirmOpen}
-        onClose={() => (moveOutMutation.isPending ? null : setConfirmOpen(false))}
-        onConfirm={handleMoveOut}
+        open={terminateTarget !== null}
+        onClose={() =>
+          terminateMutation.isPending ? undefined : setTerminateTarget(null)
+        }
+        onConfirm={() => {
+          if (!terminateTarget) return
+          terminateMutation.mutate(
+            { contractId: terminateTarget.contractId },
+            { onSuccess: () => setTerminateTarget(null) },
+          )
+        }}
         title={`${tenant.name} 님을 퇴실 처리할까요?`}
-        description="거주중 목록에서 퇴실 컬럼으로 이동합니다. 퇴실 컬럼에서 복원할 수 있습니다."
+        description="계약 상태가 TERMINATED 로 변경되며 거주중 목록에서 제거됩니다. 언제든 새 계약을 만들어 재입주시킬 수 있습니다."
         confirmLabel="퇴실"
         variant="danger"
-        loading={moveOutMutation.isPending}
+        loading={terminateMutation.isPending}
+      />
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onClose={() => (deleteMutation.isPending ? undefined : setDeleteOpen(false))}
+        onConfirm={() => {
+          deleteMutation.mutate(tenant.tenantId, {
+            onSuccess: () => {
+              setDeleteOpen(false)
+              onClose()
+            },
+          })
+        }}
+        title={`${tenant.name} 님을 완전 삭제할까요?`}
+        description="입주자 정보와 모든 계약 이력이 DB 에서 영구 제거됩니다. 복구 불가."
+        confirmLabel="완전 삭제"
+        variant="danger"
+        loading={deleteMutation.isPending}
       />
     </div>
   )
@@ -143,21 +183,10 @@ function Header({
   )
 }
 
-function InfoSection({
-  tenant,
-  roomNumber,
-}: {
-  tenant: TenantResponse
-  roomNumber: string | null
-}) {
+function InfoSection({ tenant }: { tenant: TenantResponse }) {
   return (
     <section className="flex flex-col gap-2 px-5 py-2">
       <InfoRow label="연락처" value={tenant.phoneNumber} />
-      <InfoRow label="방" value={roomNumber ? `${roomNumber}호` : '—'} />
-      <InfoRow
-        label="입실일"
-        value={tenant.moveInDate ? dateOnlyFmt.format(new Date(tenant.moveInDate)) : '—'}
-      />
       <InfoRow label="메모" value={tenant.memo ?? '—'} />
 
       <div className="mt-2 flex flex-col gap-1 border-t border-[var(--border)] pt-3 text-xs text-[var(--muted)]">
@@ -185,15 +214,88 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function Footer({
-  onEdit,
-  onMoveOut,
+function ContractsSection({
+  contracts,
+  roomNumberById,
+  onTerminate,
 }: {
-  onEdit: () => void
-  onMoveOut: () => void
+  contracts: ContractResponse[]
+  roomNumberById: Record<string, string>
+  onTerminate: (c: ContractResponse) => void
 }) {
   return (
-    <footer className="mt-auto flex gap-2 border-t border-[var(--border)] px-5 py-3">
+    <section className="flex flex-col gap-2 border-t border-[var(--border)] px-5 py-3">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+        계약 이력 ({contracts.length})
+      </h3>
+      {contracts.length === 0 ? (
+        <p className="text-xs text-[var(--muted)]">계약 없음</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {contracts.map((c) => (
+            <li
+              key={c.contractId}
+              className="flex flex-col gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-2"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium">
+                  {roomNumberById[c.roomId] ? `${roomNumberById[c.roomId]}호` : c.roomId.slice(0, 8)}
+                </span>
+                <StatusChip status={c.status} />
+              </div>
+              <div className="flex items-center justify-between text-xs text-[var(--muted)]">
+                <span>
+                  {dateOnlyFmt.format(new Date(c.startDate))} ~{' '}
+                  {dateOnlyFmt.format(new Date(c.endDate))}
+                </span>
+                <span className="tabular-nums">월 {numberFmt.format(c.monthlyRent)}원</span>
+              </div>
+              {c.status === 'ACTIVE' ? (
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={() => onTerminate(c)}
+                    className="rounded-md border border-rose-500/40 bg-rose-500/5 px-2 py-1 text-[11px] font-medium text-rose-600 transition hover:bg-rose-500/10"
+                  >
+                    이 계약 종료
+                  </button>
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+function StatusChip({ status }: { status: ContractResponse['status'] }) {
+  const cls =
+    status === 'ACTIVE'
+      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+      : status === 'TERMINATED'
+        ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300'
+        : 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
+  return (
+    <span className={['rounded-md px-2 py-0.5 text-[10px] font-semibold', cls].join(' ')}>
+      {CONTRACT_STATUS_LABEL[status]}
+    </span>
+  )
+}
+
+function Footer({
+  activeContract,
+  onEdit,
+  onTerminate,
+  onDelete,
+}: {
+  activeContract: ContractResponse | null
+  onEdit: () => void
+  onTerminate: () => void
+  onDelete: () => void
+}) {
+  return (
+    <footer className="mt-auto flex flex-wrap gap-2 border-t border-[var(--border)] px-5 py-3">
       <button
         type="button"
         onClick={onEdit}
@@ -201,13 +303,23 @@ function Footer({
       >
         수정
       </button>
-      <button
-        type="button"
-        onClick={onMoveOut}
-        className="flex-1 rounded-lg border border-rose-500/40 bg-rose-500/5 px-3 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10"
-      >
-        퇴실
-      </button>
+      {activeContract ? (
+        <button
+          type="button"
+          onClick={onTerminate}
+          className="flex-1 rounded-lg border border-rose-500/40 bg-rose-500/5 px-3 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10"
+        >
+          퇴실
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={onDelete}
+          className="flex-1 rounded-lg border border-rose-500/40 bg-rose-500/5 px-3 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10"
+        >
+          완전 삭제
+        </button>
+      )}
     </footer>
   )
 }

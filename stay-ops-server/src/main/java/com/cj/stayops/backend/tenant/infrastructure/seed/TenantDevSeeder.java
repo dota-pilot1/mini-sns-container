@@ -9,29 +9,27 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import com.cj.stayops.backend.contract.application.CreateContractUseCase;
+import com.cj.stayops.backend.contract.application.TerminateContractUseCase;
+import com.cj.stayops.backend.contract.application.dto.ContractResult;
+import com.cj.stayops.backend.contract.application.dto.CreateContractCommand;
+import com.cj.stayops.backend.contract.application.dto.TerminateContractCommand;
 import com.cj.stayops.backend.room.infrastructure.persistence.RoomJpaEntity;
 import com.cj.stayops.backend.room.infrastructure.persistence.RoomJpaRepository;
-import com.cj.stayops.backend.tenant.application.ChangeTenantStatusUseCase;
 import com.cj.stayops.backend.tenant.application.CreateTenantUseCase;
-import com.cj.stayops.backend.tenant.application.dto.ChangeTenantStatusCommand;
 import com.cj.stayops.backend.tenant.application.dto.CreateTenantCommand;
 import com.cj.stayops.backend.tenant.application.dto.TenantResult;
-import com.cj.stayops.backend.tenant.domain.model.TenantStatus;
 import com.cj.stayops.backend.tenant.infrastructure.persistence.TenantJpaRepository;
 
 /**
- * 개발 환경용 입주자 시드 데이터 러너.
+ * 개발용 입주자/계약 시더.
  * <p>
- * {@code stay-ops.dev.seed-tenants=true} 이고 DB 에 입주자가 0명일 때만 방 상태에 맞춰 더미 데이터를 삽입한다.
- * <p>
- * <b>정합성 규칙:</b> 방의 실제 상태와 입주자 상태를 맞춘다.
+ * 방 상태에 맞춰 Tenant + Contract 를 쌍으로 생성한다.
  * <ul>
- *   <li>OCCUPIED 방 → ACTIVE 입주자 1명 (모든 입실 방에 거주자 매핑)</li>
- *   <li>RESERVED 방 → RESERVED 입주자 1명 (예약 방에 입주 대기자 매핑)</li>
- *   <li>VACANT 방 2곳 → MOVED_OUT 입주자 (과거 거주자 이력 데모용)</li>
+ *   <li>OCCUPIED 방 → Tenant + ACTIVE Contract (오늘 시작, 1개월 계약)</li>
+ *   <li>RESERVED 방 → Tenant + ACTIVE Contract (미래 시작)</li>
+ *   <li>VACANT 방 최대 2개 → Tenant + TERMINATED Contract (과거 거주 이력 데모)</li>
  * </ul>
- * <p>
- * CreateTenantUseCase 를 거치므로 도메인 검증(이름/전화/메모/날짜) 이 그대로 실행된다.
  */
 @Component
 @ConditionalOnProperty(prefix = "stay-ops.dev", name = "seed-tenants", havingValue = "true")
@@ -42,16 +40,19 @@ public class TenantDevSeeder implements ApplicationRunner {
 	private final TenantJpaRepository tenantJpaRepository;
 	private final RoomJpaRepository roomJpaRepository;
 	private final CreateTenantUseCase createTenantUseCase;
-	private final ChangeTenantStatusUseCase changeTenantStatusUseCase;
+	private final CreateContractUseCase createContractUseCase;
+	private final TerminateContractUseCase terminateContractUseCase;
 
 	public TenantDevSeeder(TenantJpaRepository tenantJpaRepository,
 						   RoomJpaRepository roomJpaRepository,
 						   CreateTenantUseCase createTenantUseCase,
-						   ChangeTenantStatusUseCase changeTenantStatusUseCase) {
+						   CreateContractUseCase createContractUseCase,
+						   TerminateContractUseCase terminateContractUseCase) {
 		this.tenantJpaRepository = tenantJpaRepository;
 		this.roomJpaRepository = roomJpaRepository;
 		this.createTenantUseCase = createTenantUseCase;
-		this.changeTenantStatusUseCase = changeTenantStatusUseCase;
+		this.createContractUseCase = createContractUseCase;
+		this.terminateContractUseCase = terminateContractUseCase;
 	}
 
 	private static final String[] NAMES = {
@@ -74,7 +75,7 @@ public class TenantDevSeeder implements ApplicationRunner {
 
 		List<RoomJpaEntity> rooms = roomJpaRepository.findAll();
 		if (rooms.isEmpty()) {
-			log.info("[TenantDevSeeder] 방이 없어 입주자 시드 스킵");
+			log.info("[TenantDevSeeder] 방이 없어 시드 스킵");
 			return;
 		}
 
@@ -94,54 +95,62 @@ public class TenantDevSeeder implements ApplicationRunner {
 		LocalDate today = LocalDate.now();
 		int nameIdx = 0;
 
-		log.info("[TenantDevSeeder] 시드 시작 — OCCUPIED {}, RESERVED {}, VACANT {} 방 발견",
+		log.info("[TenantDevSeeder] 시드 시작 — OCCUPIED {}, RESERVED {}, VACANT {}",
 			occupiedRooms.size(), reservedRooms.size(), vacantRooms.size());
 
-		// OCCUPIED 방 전원에 ACTIVE 입주자 매핑
 		for (int i = 0; i < occupiedRooms.size(); i++) {
 			RoomJpaEntity room = occupiedRooms.get(i);
-			String name = NAMES[nameIdx++ % NAMES.length];
-			String phone = PHONE_PREFIX + String.format("%04d", 1000 + nameIdx * 37 % 9000);
-			LocalDate moveIn = today.minusDays(30L + i * 7L);
-
-			TenantResult created = createTenantUseCase.execute(new CreateTenantCommand(
-				name, phone, room.getId().toString(), moveIn, null
-			));
-			changeTenantStatusUseCase.execute(new ChangeTenantStatusCommand(
-				created.tenantId(), TenantStatus.ACTIVE
+			TenantResult tenant = createTenant(nameIdx++);
+			LocalDate start = today.minusDays(30L + i * 7L);
+			createContractUseCase.execute(new CreateContractCommand(
+				tenant.tenantId(),
+				room.getId().toString(),
+				start,
+				start.plusMonths(1),
+				room.getMonthlyRent(),
+				room.getDeposit()
 			));
 		}
 
-		// RESERVED 방 전원에 RESERVED 입주자 매핑
 		for (int i = 0; i < reservedRooms.size(); i++) {
 			RoomJpaEntity room = reservedRooms.get(i);
-			String name = NAMES[nameIdx++ % NAMES.length];
-			String phone = PHONE_PREFIX + String.format("%04d", 1000 + nameIdx * 37 % 9000);
-			LocalDate moveIn = today.plusDays(7L + i * 3L); // 곧 입실 예정
-
-			createTenantUseCase.execute(new CreateTenantCommand(
-				name, phone, room.getId().toString(), moveIn, null
+			TenantResult tenant = createTenant(nameIdx++);
+			LocalDate start = today.plusDays(7L + i * 3L);
+			createContractUseCase.execute(new CreateContractCommand(
+				tenant.tenantId(),
+				room.getId().toString(),
+				start,
+				start.plusMonths(1),
+				room.getMonthlyRent(),
+				room.getDeposit()
 			));
-			// 상태는 기본 RESERVED 로 시작하므로 별도 전이 불필요
 		}
 
-		// 과거 이력 데모: VACANT 방 중 앞 2개에 MOVED_OUT 이력 생성 (퇴실 후 방은 공실)
 		int historicalCount = Math.min(2, vacantRooms.size());
 		for (int i = 0; i < historicalCount; i++) {
 			RoomJpaEntity room = vacantRooms.get(i);
-			String name = NAMES[nameIdx++ % NAMES.length];
-			String phone = PHONE_PREFIX + String.format("%04d", 1000 + nameIdx * 37 % 9000);
-			LocalDate moveIn = today.minusMonths(6).minusDays(i * 14L);
-
-			TenantResult created = createTenantUseCase.execute(new CreateTenantCommand(
-				name, phone, room.getId().toString(), moveIn, null
+			TenantResult tenant = createTenant(nameIdx++);
+			LocalDate start = today.minusMonths(6).minusDays(i * 14L);
+			ContractResult contract = createContractUseCase.execute(new CreateContractCommand(
+				tenant.tenantId(),
+				room.getId().toString(),
+				start,
+				start.plusMonths(1),
+				room.getMonthlyRent(),
+				room.getDeposit()
 			));
-			changeTenantStatusUseCase.execute(new ChangeTenantStatusCommand(
-				created.tenantId(), TenantStatus.MOVED_OUT
+			terminateContractUseCase.execute(new TerminateContractCommand(
+				contract.contractId(), start.plusMonths(1)
 			));
 		}
 
-		log.info("[TenantDevSeeder] 시드 완료 — ACTIVE {}, RESERVED {}, MOVED_OUT {}",
+		log.info("[TenantDevSeeder] 시드 완료 — 거주중 {}, 예정 {}, 퇴실이력 {}",
 			occupiedRooms.size(), reservedRooms.size(), historicalCount);
+	}
+
+	private TenantResult createTenant(int idx) {
+		String name = NAMES[idx % NAMES.length];
+		String phone = PHONE_PREFIX + String.format("%04d", 1000 + (idx + 1) * 37 % 9000);
+		return createTenantUseCase.execute(new CreateTenantCommand(null, name, phone, null));
 	}
 }

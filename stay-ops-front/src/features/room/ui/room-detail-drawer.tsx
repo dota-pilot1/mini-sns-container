@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
+import { useEffect, useMemo, useState } from 'react'
 
+import { useContractsQuery } from '@/features/contract/model/use-contracts'
 import type { RoomResponse } from '@/features/room/api/room-api'
 import { useChangeRoomStatus } from '@/features/room/model/use-change-room-status'
 import { useDeleteRoom } from '@/features/room/model/use-delete-room'
@@ -9,10 +11,11 @@ import {
   ROOM_STATUS_DOT,
   ROOM_STATUS_LABEL,
   ROOM_STATUS_ORDER,
-  ROOM_TYPE_LABEL,
 } from '@/features/room/model/room-types'
 import { RoomForm } from '@/features/room/ui/room-form'
 import { RoomStatusBadge } from '@/features/room/ui/room-status-badge'
+import type { TenantResponse } from '@/features/tenant/api/tenant-api'
+import { useTenantsQuery } from '@/features/tenant/model/use-tenants'
 import { ConfirmDialog } from '@/shared/ui/dialog'
 
 const krw = new Intl.NumberFormat('ko-KR')
@@ -82,6 +85,7 @@ export function RoomDetailDrawer({ room, onClose }: Props) {
         {mode === 'view' ? (
           <>
             <StatusSection room={room} />
+            <TenantsSection roomId={room.roomId} />
             <InfoSection room={room} />
             <Footer
               onEdit={() => setMode('edit')}
@@ -205,13 +209,90 @@ function StatusSection({ room }: { room: RoomResponse }) {
   )
 }
 
+/* ───── Tenants (현재 이 방에 거주/예약된 입주자) ───── */
+
+function TenantsSection({ roomId }: { roomId: string }) {
+  const navigate = useNavigate()
+  const { data: tenants = [], isLoading: tenantsLoading } = useTenantsQuery()
+  const { data: contracts = [], isLoading: contractsLoading } = useContractsQuery({
+    roomId,
+    status: 'ACTIVE',
+  })
+
+  const linked = useMemo(() => {
+    const byId = new Map(tenants.map((t) => [t.tenantId, t]))
+    return contracts
+      .map((c) => ({ contract: c, tenant: byId.get(c.tenantId) }))
+      .filter((x): x is { contract: typeof x.contract; tenant: TenantResponse } => !!x.tenant)
+  }, [tenants, contracts])
+
+  const goToTenant = (tenantId: string) => {
+    navigate({
+      to: '/tenants',
+      search: { selected: tenantId },
+    })
+  }
+
+  return (
+    <section className="border-t border-[var(--border)] px-5 pt-4">
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+        현재 입주자
+      </h3>
+      {tenantsLoading || contractsLoading ? (
+        <div className="h-10 animate-pulse rounded-lg bg-[var(--control)]" />
+      ) : linked.length === 0 ? (
+        <p className="text-xs text-[var(--muted)]">— 배정된 입주자 없음 —</p>
+      ) : (
+        <ul className="flex flex-col gap-1.5">
+          {linked.map(({ tenant }) => (
+            <TenantRow
+              key={tenant.tenantId}
+              tenant={tenant}
+              onClick={() => goToTenant(tenant.tenantId)}
+            />
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+function TenantRow({
+  tenant,
+  onClick,
+}: {
+  tenant: TenantResponse
+  onClick: () => void
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex w-full items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-2 text-left transition hover:border-[var(--accent)]"
+      >
+        <div className="flex flex-col">
+          <span className="text-sm font-semibold tracking-[-0.01em]">
+            {tenant.name}
+          </span>
+          <span className="tabular-nums text-xs text-[var(--muted)]">
+            {tenant.phoneNumber}
+          </span>
+        </div>
+        <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+          거주중
+        </span>
+      </button>
+    </li>
+  )
+}
+
 /* ───── Info grid ───── */
 
 function InfoSection({ room }: { room: RoomResponse }) {
   return (
     <section className="flex flex-col gap-2 border-t border-[var(--border)] px-5 py-4">
       <InfoRow label="층" value={`${room.floor}F`} />
-      <InfoRow label="타입" value={ROOM_TYPE_LABEL[room.roomType]} />
       <InfoRow label="평수" value={`${Number(room.sizePyeong)}평`} />
       <InfoRow label="월세" value={`${krw.format(room.monthlyRent)}원`} />
       <InfoRow label="보증금" value={`${krw.format(room.deposit)}원`} />

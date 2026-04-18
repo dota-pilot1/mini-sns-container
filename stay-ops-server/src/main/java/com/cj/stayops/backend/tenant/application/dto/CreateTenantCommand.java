@@ -1,11 +1,8 @@
 package com.cj.stayops.backend.tenant.application.dto;
 
-import java.time.LocalDate;
-
 public record CreateTenantCommand(
+	String userId,     // nullable — 기존 User 와 연결된 경우
 	String name,
 	String phoneNumber,
-	String roomId,       // nullable UUID 문자열 — 입주 예약 단계라 방 미배정 가능
-	LocalDate moveInDate, // nullable
-	String memo           // nullable
+	String memo
 ) { }

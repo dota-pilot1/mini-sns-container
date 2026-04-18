@@ -2,7 +2,6 @@ package com.cj.stayops.backend.tenant.application;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,15 +32,10 @@ public class UpdateTenantUseCase {
 			.orElseThrow(() -> new TenantNotFoundException(command.tenantId()));
 
 		PhoneNumber newPhone = command.phoneNumber() == null ? null : PhoneNumber.of(command.phoneNumber());
-		UUID newRoomId = command.roomId() == null ? null : UUID.fromString(command.roomId());
 
 		Tenant updated = tenant.update(
 			command.name(),
 			newPhone,
-			newRoomId,
-			command.clearRoom(),
-			command.moveInDate(),
-			command.moveOutDate(),
 			command.memo(),
 			Instant.now(clock)
 		);

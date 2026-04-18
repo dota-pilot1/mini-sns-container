@@ -11,9 +11,13 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.cj.stayops.backend.auth.domain.exception.InvalidCredentialsException;
 import com.cj.stayops.backend.auth.domain.exception.WeakPasswordException;
 import com.cj.stayops.backend.auth.presentation.dto.ErrorResponse;
+import com.cj.stayops.backend.contract.domain.exception.ContractNotFoundException;
+import com.cj.stayops.backend.contract.domain.exception.InvalidContractFieldException;
 import com.cj.stayops.backend.room.domain.exception.DuplicateRoomNumberException;
 import com.cj.stayops.backend.room.domain.exception.InvalidRoomFieldException;
 import com.cj.stayops.backend.room.domain.exception.RoomNotFoundException;
+import com.cj.stayops.backend.tenant.domain.exception.InvalidTenantFieldException;
+import com.cj.stayops.backend.tenant.domain.exception.TenantNotFoundException;
 import com.cj.stayops.backend.user.domain.exception.DuplicateEmailException;
 import com.cj.stayops.backend.user.domain.exception.InvalidEmailException;
 
@@ -89,5 +93,39 @@ public class AuthExceptionHandler {
 	public ResponseEntity<ErrorResponse> handleRoomNotFound(RoomNotFoundException e) {
 		return ResponseEntity.status(HttpStatus.NOT_FOUND)
 			.body(ErrorResponse.of("ROOM_NOT_FOUND", e.getMessage()));
+	}
+
+	/** 입주자 필드 도메인 검증 실패 → 400 Bad Request. */
+	@ExceptionHandler(InvalidTenantFieldException.class)
+	public ResponseEntity<ErrorResponse> handleInvalidTenantField(InvalidTenantFieldException e) {
+		List<ErrorResponse.FieldError> errors = List.of(
+			new ErrorResponse.FieldError(e.field(), e.getMessage())
+		);
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+			.body(ErrorResponse.of("INVALID_TENANT_FIELD", e.getMessage(), errors));
+	}
+
+	/** 존재하지 않는 입주자 → 404 Not Found. */
+	@ExceptionHandler(TenantNotFoundException.class)
+	public ResponseEntity<ErrorResponse> handleTenantNotFound(TenantNotFoundException e) {
+		return ResponseEntity.status(HttpStatus.NOT_FOUND)
+			.body(ErrorResponse.of("TENANT_NOT_FOUND", e.getMessage()));
+	}
+
+	/** 계약 필드 도메인 검증 실패 → 400 Bad Request. */
+	@ExceptionHandler(InvalidContractFieldException.class)
+	public ResponseEntity<ErrorResponse> handleInvalidContractField(InvalidContractFieldException e) {
+		List<ErrorResponse.FieldError> errors = List.of(
+			new ErrorResponse.FieldError(e.field(), e.getMessage())
+		);
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+			.body(ErrorResponse.of("INVALID_CONTRACT_FIELD", e.getMessage(), errors));
+	}
+
+	/** 존재하지 않는 계약 → 404 Not Found. */
+	@ExceptionHandler(ContractNotFoundException.class)
+	public ResponseEntity<ErrorResponse> handleContractNotFound(ContractNotFoundException e) {
+		return ResponseEntity.status(HttpStatus.NOT_FOUND)
+			.body(ErrorResponse.of("CONTRACT_NOT_FOUND", e.getMessage()));
 	}
 }

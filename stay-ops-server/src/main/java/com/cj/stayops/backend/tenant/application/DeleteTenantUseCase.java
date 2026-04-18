@@ -1,34 +1,35 @@
 package com.cj.stayops.backend.tenant.application;
 
-import java.time.Clock;
-import java.time.Instant;
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.cj.stayops.backend.contract.domain.repository.ContractRepository;
 import com.cj.stayops.backend.tenant.domain.exception.TenantNotFoundException;
-import com.cj.stayops.backend.tenant.domain.model.Tenant;
 import com.cj.stayops.backend.tenant.domain.model.TenantId;
 import com.cj.stayops.backend.tenant.domain.repository.TenantRepository;
 
+/**
+ * 입주자를 완전 삭제한다. 관련된 모든 Contract 도 함께 제거 (cascade).
+ */
 @Service
 public class DeleteTenantUseCase {
 
 	private final TenantRepository tenantRepository;
-	private final Clock clock;
+	private final ContractRepository contractRepository;
 
-	public DeleteTenantUseCase(TenantRepository tenantRepository, Clock clock) {
+	public DeleteTenantUseCase(TenantRepository tenantRepository,
+							   ContractRepository contractRepository) {
 		this.tenantRepository = tenantRepository;
-		this.clock = clock;
+		this.contractRepository = contractRepository;
 	}
 
 	@Transactional
 	public void execute(String tenantId) {
 		TenantId id = TenantId.of(tenantId);
-		Tenant tenant = tenantRepository.findById(id)
+		tenantRepository.findById(id)
 			.orElseThrow(() -> new TenantNotFoundException(tenantId));
 
-		Tenant deleted = tenant.markDeleted(Instant.now(clock));
-		tenantRepository.save(deleted);
+		contractRepository.deleteByTenantId(id.value());
+		tenantRepository.deleteById(id);
 	}
 }

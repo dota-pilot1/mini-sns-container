@@ -2,11 +2,12 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useCallback, useMemo, useState } from 'react'
 
 import type { TenantsSearch } from '@/app/router'
+import type { ContractResponse } from '@/features/contract/api/contract-api'
+import { useContractsQuery } from '@/features/contract/model/use-contracts'
+import { useTerminateContract } from '@/features/contract/model/use-terminate-contract'
 import { useRoomsQuery } from '@/features/room/model/use-rooms'
 import type { TenantResponse } from '@/features/tenant/api/tenant-api'
 import { useDeleteTenant } from '@/features/tenant/model/use-delete-tenant'
-import { useHardDeleteTenant } from '@/features/tenant/model/use-hard-delete-tenant'
-import { useRestoreTenant } from '@/features/tenant/model/use-restore-tenant'
 import { useTenantsQuery } from '@/features/tenant/model/use-tenants'
 import { TenantDetailDrawer } from '@/features/tenant/ui/tenant-detail-drawer'
 import { TenantMoveInDialog } from '@/features/tenant/ui/tenant-move-in-dialog'
@@ -15,12 +16,24 @@ import { useUsersQuery } from '@/features/user/model/use-users'
 import { ConfirmDialog } from '@/shared/ui/dialog'
 
 const USER_PAGE_SIZE = 100
-
+const numberFmt = new Intl.NumberFormat('ko-KR')
 const dateOnlyFmt = new Intl.DateTimeFormat('ko-KR', {
   year: 'numeric',
   month: '2-digit',
   day: '2-digit',
 })
+
+type ActiveEntry = {
+  tenant: TenantResponse
+  contract: ContractResponse
+  roomNumber: string | null
+}
+
+type MovedOutEntry = {
+  tenant: TenantResponse
+  lastContract: ContractResponse | null
+  roomNumber: string | null
+}
 
 export function TenantListPage() {
   const search = useSearch({ from: '/tenants' }) as TenantsSearch
@@ -28,8 +41,8 @@ export function TenantListPage() {
 
   const selectedTenantId = search.selected ?? null
   const [moveInUser, setMoveInUser] = useState<UserResponse | null>(null)
-  const [moveOutTarget, setMoveOutTarget] = useState<TenantResponse | null>(null)
-  const [hardDeleteTarget, setHardDeleteTarget] = useState<TenantResponse | null>(null)
+  const [terminateTarget, setTerminateTarget] = useState<ActiveEntry | null>(null)
+  const [hardDeleteTarget, setHardDeleteTarget] = useState<MovedOutEntry | null>(null)
 
   const setSelected = useCallback(
     (tenantId: string | null) => {
@@ -43,17 +56,14 @@ export function TenantListPage() {
 
   const { data: userPage } = useUsersQuery({ page: 0, size: USER_PAGE_SIZE })
   const { data: rooms = [] } = useRoomsQuery()
-  const { data: activeTenants = [], isLoading: activeLoading } = useTenantsQuery()
-  const { data: deletedTenants = [], isLoading: deletedLoading } = useTenantsQuery({
-    deletedOnly: true,
-  })
+  const { data: tenants = [], isLoading: tenantsLoading } = useTenantsQuery()
+  const { data: contracts = [], isLoading: contractsLoading } = useContractsQuery()
 
-  const restoreMutation = useRestoreTenant()
-  const hardDeleteMutation = useHardDeleteTenant()
-  const moveOutMutation = useDeleteTenant()
+  const terminateMutation = useTerminateContract()
+  const hardDeleteMutation = useDeleteTenant()
 
-  const users = useMemo(() => userPage?.items ?? [], [userPage])
-  const totalUsers = userPage?.totalElements ?? 0
+  const allUsers = useMemo(() => userPage?.items ?? [], [userPage])
+  const totalUsersRaw = userPage?.totalElements ?? 0
 
   const roomNumberById = useMemo(() => {
     const map: Record<string, string> = {}
@@ -61,19 +71,85 @@ export function TenantListPage() {
     return map
   }, [rooms])
 
+  /** 이미 입주자로 등록된 User id 집합 — 회원 컬럼에서 숨긴다. */
+  const tenantUserIdSet = useMemo(() => {
+    const set = new Set<string>()
+    for (const t of tenants) if (t.userId) set.add(t.userId)
+    return set
+  }, [tenants])
+
+  const users = useMemo(
+    () => allUsers.filter((u) => !tenantUserIdSet.has(u.userId)),
+    [allUsers, tenantUserIdSet],
+  )
+  const hiddenUsers = allUsers.length - users.length
+
+  /** tenantId → contracts, newest first. */
+  const contractsByTenant = useMemo(() => {
+    const map = new Map<string, ContractResponse[]>()
+    for (const c of contracts) {
+      const list = map.get(c.tenantId) ?? []
+      list.push(c)
+      map.set(c.tenantId, list)
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => b.startDate.localeCompare(a.startDate))
+    }
+    return map
+  }, [contracts])
+
+  const activeEntries = useMemo<ActiveEntry[]>(() => {
+    const list: ActiveEntry[] = []
+    for (const tenant of tenants) {
+      const tc = contractsByTenant.get(tenant.tenantId) ?? []
+      const active = tc.find((c) => c.status === 'ACTIVE')
+      if (active) {
+        list.push({
+          tenant,
+          contract: active,
+          roomNumber: roomNumberById[active.roomId] ?? null,
+        })
+      }
+    }
+    // 호실 오름차순 (방 미상은 맨 뒤)
+    return list.sort((a, b) => {
+      if (a.roomNumber === null && b.roomNumber === null) return 0
+      if (a.roomNumber === null) return 1
+      if (b.roomNumber === null) return -1
+      return a.roomNumber.localeCompare(b.roomNumber)
+    })
+  }, [tenants, contractsByTenant, roomNumberById])
+
+  const movedOutEntries = useMemo<MovedOutEntry[]>(() => {
+    const list: MovedOutEntry[] = []
+    for (const tenant of tenants) {
+      const tc = contractsByTenant.get(tenant.tenantId) ?? []
+      if (tc.some((c) => c.status === 'ACTIVE')) continue
+      const last = tc[0] ?? null
+      list.push({
+        tenant,
+        lastContract: last,
+        roomNumber: last ? roomNumberById[last.roomId] ?? null : null,
+      })
+    }
+    return list
+  }, [tenants, contractsByTenant, roomNumberById])
+
   const occupiedRoomIds = useMemo(() => {
     const set = new Set<string>()
-    for (const t of activeTenants) if (t.roomId) set.add(t.roomId)
+    for (const e of activeEntries) set.add(e.contract.roomId)
     return set
-  }, [activeTenants])
+  }, [activeEntries])
 
   const selectedTenant = useMemo(
     () =>
       selectedTenantId
-        ? activeTenants.find((t) => t.tenantId === selectedTenantId) ?? null
+        ? tenants.find((t) => t.tenantId === selectedTenantId) ?? null
         : null,
-    [activeTenants, selectedTenantId],
+    [tenants, selectedTenantId],
   )
+
+  const loading = tenantsLoading || contractsLoading
 
   return (
     <div className="-mx-4 -my-4 flex min-h-[calc(100svh-3.5rem)] flex-col gap-4 px-4 py-4 md:-mx-6 md:-my-6 md:px-6 md:py-6">
@@ -81,8 +157,8 @@ export function TenantListPage() {
         <div className="flex items-baseline gap-3">
           <h1 className="text-xl font-bold tracking-[-0.03em]">입주자 관리</h1>
           <span className="text-xs text-[var(--muted)]">
-            회원 {totalUsers.toLocaleString('ko-KR')} · 거주중 {activeTenants.length} · 퇴실{' '}
-            {deletedTenants.length}
+            회원 {users.length} · 거주중 {activeEntries.length} · 퇴실{' '}
+            {movedOutEntries.length}
           </span>
         </div>
       </header>
@@ -92,41 +168,44 @@ export function TenantListPage() {
           title="회원"
           subtitle="입주 희망자"
           count={users.length}
-          totalCount={totalUsers}
           accent="sky"
         >
           {users.length === 0 ? (
-            <Empty>회원이 없습니다.</Empty>
+            <Empty>입주 가능한 회원이 없습니다.</Empty>
           ) : (
             users.map((u) => (
               <MemberCard key={u.userId} user={u} onMoveIn={() => setMoveInUser(u)} />
             ))
           )}
-          {totalUsers > users.length ? (
-            <p className="px-1 py-2 text-center text-xs text-[var(--muted)]">
-              + {totalUsers - users.length}명 (최대 {USER_PAGE_SIZE}명 표시)
+          {hiddenUsers > 0 ? (
+            <p className="px-1 py-2 text-center text-[11px] text-[var(--muted)]">
+              이미 입주한 {hiddenUsers}명은 거주중 컬럼에서 확인
+            </p>
+          ) : null}
+          {totalUsersRaw > allUsers.length ? (
+            <p className="px-1 pb-2 text-center text-[11px] text-[var(--muted)]">
+              + {totalUsersRaw - allUsers.length}명 (최대 {USER_PAGE_SIZE}명 표시)
             </p>
           ) : null}
         </Column>
 
         <Column
           title="거주중"
-          subtitle="현재 입주 중"
-          count={activeTenants.length}
+          subtitle="ACTIVE 계약 보유"
+          count={activeEntries.length}
           accent="emerald"
         >
-          {activeLoading ? (
+          {loading ? (
             <SkeletonCards />
-          ) : activeTenants.length === 0 ? (
+          ) : activeEntries.length === 0 ? (
             <Empty>거주중 인원이 없습니다.</Empty>
           ) : (
-            activeTenants.map((t) => (
+            activeEntries.map((e) => (
               <ActiveTenantCard
-                key={t.tenantId}
-                tenant={t}
-                roomNumber={t.roomId ? roomNumberById[t.roomId] ?? null : null}
-                onOpen={() => setSelected(t.tenantId)}
-                onMoveOut={() => setMoveOutTarget(t)}
+                key={e.tenant.tenantId}
+                entry={e}
+                onOpen={() => setSelected(e.tenant.tenantId)}
+                onTerminate={() => setTerminateTarget(e)}
               />
             ))
           )}
@@ -134,23 +213,21 @@ export function TenantListPage() {
 
         <Column
           title="퇴실"
-          subtitle="복원 또는 완전 삭제 가능"
-          count={deletedTenants.length}
+          subtitle="활성 계약 없음"
+          count={movedOutEntries.length}
           accent="slate"
         >
-          {deletedLoading ? (
+          {loading ? (
             <SkeletonCards />
-          ) : deletedTenants.length === 0 ? (
-            <Empty>퇴실 기록이 없습니다.</Empty>
+          ) : movedOutEntries.length === 0 ? (
+            <Empty>퇴실 이력이 없습니다.</Empty>
           ) : (
-            deletedTenants.map((t) => (
-              <DeletedTenantCard
-                key={t.tenantId}
-                tenant={t}
-                roomNumber={t.roomId ? roomNumberById[t.roomId] ?? null : null}
-                restoring={restoreMutation.isPending && restoreMutation.variables === t.tenantId}
-                onRestore={() => restoreMutation.mutate(t.tenantId)}
-                onHardDelete={() => setHardDeleteTarget(t)}
+            movedOutEntries.map((e) => (
+              <MovedOutCard
+                key={e.tenant.tenantId}
+                entry={e}
+                onOpen={() => setSelected(e.tenant.tenantId)}
+                onHardDelete={() => setHardDeleteTarget(e)}
               />
             ))
           )}
@@ -166,26 +243,28 @@ export function TenantListPage() {
 
       <TenantDetailDrawer
         tenant={selectedTenant}
-        rooms={rooms}
+        contracts={contracts}
+        roomNumberById={roomNumberById}
         onClose={() => setSelected(null)}
       />
 
       <ConfirmDialog
-        open={moveOutTarget !== null}
+        open={terminateTarget !== null}
         onClose={() =>
-          moveOutMutation.isPending ? undefined : setMoveOutTarget(null)
+          terminateMutation.isPending ? undefined : setTerminateTarget(null)
         }
         onConfirm={() => {
-          if (!moveOutTarget) return
-          moveOutMutation.mutate(moveOutTarget.tenantId, {
-            onSuccess: () => setMoveOutTarget(null),
-          })
+          if (!terminateTarget) return
+          terminateMutation.mutate(
+            { contractId: terminateTarget.contract.contractId },
+            { onSuccess: () => setTerminateTarget(null) },
+          )
         }}
-        title={`${moveOutTarget?.name ?? ''} 님을 퇴실 처리할까요?`}
-        description="거주중 목록에서 퇴실 컬럼으로 이동합니다. 퇴실 컬럼에서 복원할 수 있습니다."
+        title={`${terminateTarget?.tenant.name ?? ''} 님을 퇴실 처리할까요?`}
+        description="계약이 TERMINATED 로 변경되며 퇴실 컬럼으로 이동합니다."
         confirmLabel="퇴실"
         variant="danger"
-        loading={moveOutMutation.isPending}
+        loading={terminateMutation.isPending}
       />
 
       <ConfirmDialog
@@ -195,12 +274,12 @@ export function TenantListPage() {
         }
         onConfirm={() => {
           if (!hardDeleteTarget) return
-          hardDeleteMutation.mutate(hardDeleteTarget.tenantId, {
+          hardDeleteMutation.mutate(hardDeleteTarget.tenant.tenantId, {
             onSuccess: () => setHardDeleteTarget(null),
           })
         }}
-        title={`${hardDeleteTarget?.name ?? ''} 님을 완전히 삭제할까요?`}
-        description="DB 에서 영구 제거되며 복구할 수 없습니다."
+        title={`${hardDeleteTarget?.tenant.name ?? ''} 님을 완전히 삭제할까요?`}
+        description="모든 계약 이력이 함께 DB 에서 제거되며 복구할 수 없습니다."
         confirmLabel="완전 삭제"
         variant="danger"
         loading={hardDeleteMutation.isPending}
@@ -263,7 +342,7 @@ function MemberCard({
   onMoveIn: () => void
 }) {
   return (
-    <div className="group flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-2.5 transition hover:border-[var(--accent)]">
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-2.5 transition hover:border-[var(--accent)]">
       <div className="flex min-w-0 flex-col">
         <span className="truncate text-sm font-medium">{user.name}</span>
         <span className="truncate text-xs text-[var(--muted)]">{user.email}</span>
@@ -283,34 +362,36 @@ function MemberCard({
 }
 
 function ActiveTenantCard({
-  tenant,
-  roomNumber,
+  entry,
   onOpen,
-  onMoveOut,
+  onTerminate,
 }: {
-  tenant: TenantResponse
-  roomNumber: string | null
+  entry: ActiveEntry
   onOpen: () => void
-  onMoveOut: () => void
+  onTerminate: () => void
 }) {
+  const { tenant, contract, roomNumber } = entry
   return (
     <div className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-strong)] transition hover:border-[var(--accent)]">
       <button
         type="button"
         onClick={onOpen}
-        className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-l-xl px-3 py-2.5 text-left"
+        className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-l-xl px-3 py-2.5 text-left"
       >
-        <div className="flex min-w-0 flex-col">
+        <div className="flex items-center justify-between gap-3">
           <span className="truncate text-sm font-medium">{tenant.name}</span>
-          <span className="truncate text-xs text-[var(--muted)]">{tenant.phoneNumber}</span>
+          <span className="shrink-0 rounded-md bg-[var(--control)] px-2 py-0.5 text-[11px] font-medium tabular-nums text-[var(--muted)]">
+            {roomNumber ? `${roomNumber}호` : '방 미상'}
+          </span>
         </div>
-        <span className="shrink-0 rounded-md bg-[var(--control)] px-2 py-0.5 text-[11px] font-medium tabular-nums text-[var(--muted)]">
-          {roomNumber ? `${roomNumber}호` : '미배정'}
-        </span>
+        <div className="flex items-center justify-between gap-3 text-xs text-[var(--muted)]">
+          <span className="truncate">{tenant.phoneNumber}</span>
+          <span className="tabular-nums">월 {numberFmt.format(contract.monthlyRent)}원</span>
+        </div>
       </button>
       <button
         type="button"
-        onClick={onMoveOut}
+        onClick={onTerminate}
         aria-label={`${tenant.name} 퇴실`}
         className="mr-2 shrink-0 rounded-lg border border-rose-500/40 bg-rose-500/5 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-500/10"
       >
@@ -320,43 +401,41 @@ function ActiveTenantCard({
   )
 }
 
-function DeletedTenantCard({
-  tenant,
-  roomNumber,
-  restoring,
-  onRestore,
+function MovedOutCard({
+  entry,
+  onOpen,
   onHardDelete,
 }: {
-  tenant: TenantResponse
-  roomNumber: string | null
-  restoring: boolean
-  onRestore: () => void
+  entry: MovedOutEntry
+  onOpen: () => void
   onHardDelete: () => void
 }) {
+  const { tenant, lastContract, roomNumber } = entry
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-2.5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex flex-col gap-0.5 text-left"
+      >
+        <div className="flex items-center justify-between gap-3">
           <span className="truncate text-sm font-medium">{tenant.name}</span>
-          <span className="truncate text-xs text-[var(--muted)]">{tenant.phoneNumber}</span>
+          <span className="shrink-0 rounded-md bg-[var(--control)] px-2 py-0.5 text-[11px] font-medium tabular-nums text-[var(--muted)]">
+            {roomNumber ? `${roomNumber}호` : '—'}
+          </span>
         </div>
-        <span className="shrink-0 rounded-md bg-[var(--control)] px-2 py-0.5 text-[11px] font-medium tabular-nums text-[var(--muted)]">
-          {roomNumber ? `${roomNumber}호` : '미배정'}
-        </span>
-      </div>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={onRestore}
-          disabled={restoring}
-          className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--control)] px-2 py-1 text-xs font-medium text-[var(--foreground)] transition hover:bg-[var(--control-hover)] disabled:opacity-60"
-        >
-          {restoring ? '복원 중…' : '복원'}
-        </button>
+        <span className="truncate text-xs text-[var(--muted)]">{tenant.phoneNumber}</span>
+        {lastContract ? (
+          <span className="text-[11px] text-[var(--muted)]">
+            마지막 계약 {dateOnlyFmt.format(new Date(lastContract.endDate))}
+          </span>
+        ) : null}
+      </button>
+      <div className="flex justify-end">
         <button
           type="button"
           onClick={onHardDelete}
-          className="flex-1 rounded-lg border border-rose-500/40 bg-rose-500/5 px-2 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-500/10"
+          className="rounded-lg border border-rose-500/40 bg-rose-500/5 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-500/10"
         >
           완전 삭제
         </button>

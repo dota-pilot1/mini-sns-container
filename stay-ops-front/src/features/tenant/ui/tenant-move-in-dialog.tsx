@@ -3,9 +3,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
+import { useCreateContract } from '@/features/contract/model/use-create-contract'
 import type { RoomResponse } from '@/features/room/api/room-api'
-import type { CreateTenantPayload } from '@/features/tenant/api/tenant-api'
 import { useCreateTenant } from '@/features/tenant/model/use-create-tenant'
+import { useTenantsQuery } from '@/features/tenant/model/use-tenants'
 import type { UserResponse } from '@/features/user/api/user-api'
 import { ApiError } from '@/shared/api/types'
 import { Dialog } from '@/shared/ui/dialog'
@@ -17,11 +18,26 @@ const moveInSchema = z.object({
     .string()
     .trim()
     .regex(phoneRegex, '01X-XXXX-XXXX 형식으로 입력해주세요.'),
-  moveInDate: z.string().optional(),
+  startDate: z.string().min(1, '입실일은 필수입니다.'),
+  endDate: z.string().min(1, '계약 종료일은 필수입니다.'),
+  monthlyRent: z.number().int().nonnegative('월세는 0 이상이어야 합니다.'),
+  deposit: z.number().int().nonnegative('보증금은 0 이상이어야 합니다.'),
   memo: z.string().max(500, '메모는 500자 이하여야 합니다.').optional(),
 })
 
 type MoveInValues = z.infer<typeof moveInSchema>
+
+const numberFmt = new Intl.NumberFormat('ko-KR')
+
+function todayString() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function addMonthString(isoDate: string, months: number): string {
+  const d = new Date(isoDate)
+  d.setMonth(d.getMonth() + months)
+  return d.toISOString().slice(0, 10)
+}
 
 type Props = {
   user: UserResponse | null
@@ -33,8 +49,7 @@ type Props = {
 }
 
 /**
- * 회원(User) → 입주자(Tenant) 전환 다이얼로그.
- * 좌: 입주 정보 입력, 우: 층별 방 그리드 (점유중이면 비활성).
+ * 회원(User) → 입주자(Tenant) + 계약(Contract) 생성 다이얼로그.
  */
 export function TenantMoveInDialog({
   user,
@@ -43,8 +58,15 @@ export function TenantMoveInDialog({
   onClose,
   onCreated,
 }: Props) {
-  const createMutation = useCreateTenant()
+  const createTenant = useCreateTenant()
+  const createContract = useCreateContract()
+  const { data: existingTenants = [] } = useTenantsQuery()
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [topError, setTopError] = useState<string | null>(null)
+  const [phoneCheck, setPhoneCheck] = useState<
+    { status: 'ok'; phone: string } | { status: 'dup'; phone: string; name: string } | null
+  >(null)
 
   const open = user !== null
 
@@ -52,28 +74,72 @@ export function TenantMoveInDialog({
     register,
     handleSubmit,
     reset,
+    setValue,
+    getValues,
     setError,
     formState: { errors },
+    watch,
   } = useForm<MoveInValues>({
     resolver: zodResolver(moveInSchema),
     mode: 'onTouched',
     defaultValues: {
       phoneNumber: '',
-      moveInDate: new Date().toISOString().slice(0, 10),
+      startDate: todayString(),
+      endDate: addMonthString(todayString(), 1),
+      monthlyRent: 0,
+      deposit: 0,
       memo: '',
     },
   })
 
+  const startDateValue = watch('startDate')
+
   useEffect(() => {
     if (user) {
+      const start = todayString()
       reset({
         phoneNumber: '',
-        moveInDate: new Date().toISOString().slice(0, 10),
+        startDate: start,
+        endDate: addMonthString(start, 1),
+        monthlyRent: 0,
+        deposit: 0,
         memo: '',
       })
       setSelectedRoomId(null)
+      setTopError(null)
+      setPhoneCheck(null)
     }
   }, [user, reset])
+
+  const phoneInputReg = register('phoneNumber')
+
+  const onCheckPhone = () => {
+    const normalized = (getValues('phoneNumber') ?? '').replace(/\D/g, '')
+    if (!normalized) return
+    const hit = existingTenants.find(
+      (t) => t.phoneNumber.replace(/\D/g, '') === normalized,
+    )
+    if (hit) {
+      setPhoneCheck({ status: 'dup', phone: normalized, name: hit.name })
+    } else {
+      setPhoneCheck({ status: 'ok', phone: normalized })
+    }
+  }
+
+  // 방 선택 시 월세·보증금 기본값 주입
+  useEffect(() => {
+    if (!selectedRoomId) return
+    const room = rooms.find((r) => r.roomId === selectedRoomId)
+    if (!room) return
+    setValue('monthlyRent', room.monthlyRent, { shouldDirty: true })
+    setValue('deposit', room.deposit, { shouldDirty: true })
+  }, [selectedRoomId, rooms, setValue])
+
+  // 시작일 변경 시 종료일 = 시작일 + 1개월 자동 보정
+  useEffect(() => {
+    if (!startDateValue) return
+    setValue('endDate', addMonthString(startDateValue, 1), { shouldDirty: true })
+  }, [startDateValue, setValue])
 
   const roomsByFloor = useMemo(() => {
     const grouped = new Map<number, RoomResponse[]>()
@@ -95,38 +161,62 @@ export function TenantMoveInDialog({
   const submit = handleSubmit(async (values) => {
     if (!user) return
 
-    const payload: CreateTenantPayload = {
-      name: user.name,
-      phoneNumber: values.phoneNumber,
-      roomId: selectedRoomId,
-      moveInDate: values.moveInDate?.trim() || null,
-      memo: values.memo?.trim() ? values.memo.trim() : null,
+    if (!selectedRoomId) {
+      setTopError('방을 선택해주세요.')
+      return
     }
 
+    setTopError(null)
+    setSubmitting(true)
     try {
-      const created = await createMutation.mutateAsync(payload)
-      onCreated?.(created.tenantId)
+      const tenant = await createTenant.mutateAsync({
+        userId: user.userId,
+        name: user.name,
+        phoneNumber: values.phoneNumber,
+        memo: values.memo?.trim() ? values.memo.trim() : null,
+      })
+
+      await createContract.mutateAsync({
+        tenantId: tenant.tenantId,
+        roomId: selectedRoomId,
+        startDate: values.startDate,
+        endDate: values.endDate,
+        monthlyRent: values.monthlyRent,
+        deposit: values.deposit,
+      })
+
+      onCreated?.(tenant.tenantId)
       onClose()
     } catch (err) {
       if (err instanceof ApiError && err.fieldErrors.length > 0) {
         for (const fe of err.fieldErrors) {
-          if (fe.field === 'phoneNumber' || fe.field === 'memo' || fe.field === 'moveInDate') {
+          if (
+            fe.field === 'phoneNumber' ||
+            fe.field === 'memo' ||
+            fe.field === 'startDate' ||
+            fe.field === 'endDate' ||
+            fe.field === 'monthlyRent' ||
+            fe.field === 'deposit'
+          ) {
             setError(fe.field as keyof MoveInValues, {
               type: 'server',
               message: fe.message,
             })
           }
         }
+        setTopError(err.message)
         return
       }
-      throw err
+      setTopError(err instanceof Error ? err.message : '알 수 없는 오류')
+    } finally {
+      setSubmitting(false)
     }
   })
 
   return (
     <Dialog
       open={open}
-      onClose={() => (createMutation.isPending ? undefined : onClose())}
+      onClose={() => (submitting ? undefined : onClose())}
       ariaLabel="입주 처리"
       maxWidth="max-w-4xl"
       closeOnBackdrop={false}
@@ -143,7 +233,7 @@ export function TenantMoveInDialog({
         <button
           type="button"
           onClick={onClose}
-          disabled={createMutation.isPending}
+          disabled={submitting}
           aria-label="닫기"
           className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--muted)] transition hover:bg-[var(--control)] hover:text-[var(--foreground)] disabled:opacity-40"
         >
@@ -151,27 +241,73 @@ export function TenantMoveInDialog({
         </button>
       </div>
 
-      <form onSubmit={submit} className="grid grid-cols-1 gap-0 md:grid-cols-[minmax(0,320px)_1fr]">
+      <form onSubmit={submit} className="grid grid-cols-1 gap-0 md:grid-cols-[minmax(0,340px)_1fr]">
         {/* 왼쪽: 입력 필드 */}
         <div className="flex flex-col gap-4 border-b border-[var(--border)] px-5 py-4 md:border-b-0 md:border-r">
           <Field label="연락처" error={errors.phoneNumber?.message}>
-            <input
-              {...register('phoneNumber')}
-              placeholder="010-1234-5678"
-              inputMode="tel"
-              autoComplete="off"
-              className={inputCls}
-            />
+            <div className="flex gap-2">
+              <input
+                {...phoneInputReg}
+                onChange={(e) => {
+                  phoneInputReg.onChange(e)
+                  if (phoneCheck) setPhoneCheck(null)
+                }}
+                placeholder="010-1234-5678"
+                inputMode="tel"
+                autoComplete="off"
+                className={[inputCls, 'flex-1'].join(' ')}
+              />
+              <button
+                type="button"
+                onClick={onCheckPhone}
+                className="shrink-0 rounded-lg border border-[var(--border)] bg-[var(--control)] px-3 py-2 text-xs font-medium text-[var(--foreground)] transition hover:bg-[var(--control-hover)]"
+              >
+                중복 확인
+              </button>
+            </div>
+            {phoneCheck?.status === 'ok' ? (
+              <span className="text-xs text-emerald-600">
+                ✓ 사용 가능한 번호입니다.
+              </span>
+            ) : phoneCheck?.status === 'dup' ? (
+              <span className="text-xs text-rose-500">
+                이미 등록된 입주자입니다: {phoneCheck.name}
+              </span>
+            ) : null}
           </Field>
 
-          <Field label="입실일" error={errors.moveInDate?.message}>
-            <input type="date" {...register('moveInDate')} className={inputCls} />
-          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="계약 시작" error={errors.startDate?.message}>
+              <input type="date" {...register('startDate')} className={inputCls} />
+            </Field>
+            <Field label="계약 종료" error={errors.endDate?.message}>
+              <input type="date" {...register('endDate')} className={inputCls} />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="월세 (원)" error={errors.monthlyRent?.message}>
+              <input
+                type="number"
+                inputMode="numeric"
+                {...register('monthlyRent', { valueAsNumber: true })}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="보증금 (원)" error={errors.deposit?.message}>
+              <input
+                type="number"
+                inputMode="numeric"
+                {...register('deposit', { valueAsNumber: true })}
+                className={inputCls}
+              />
+            </Field>
+          </div>
 
           <Field label="메모" error={errors.memo?.message}>
             <textarea
               {...register('memo')}
-              rows={5}
+              rows={3}
               placeholder="특이사항이 있다면…"
               className={[inputCls, 'resize-none'].join(' ')}
             />
@@ -182,7 +318,7 @@ export function TenantMoveInDialog({
             <span className="text-[var(--muted)]">
               {selectedRoomId
                 ? `${rooms.find((r) => r.roomId === selectedRoomId)?.roomNumber ?? ''}호`
-                : '미배정'}
+                : '미선택'}
             </span>
           </div>
         </div>
@@ -197,12 +333,6 @@ export function TenantMoveInDialog({
           </div>
 
           <div className="flex flex-col gap-4 max-h-[420px] overflow-y-auto pr-1">
-            {/* 미배정 카드 */}
-            <UnassignedTile
-              selected={selectedRoomId === null}
-              onSelect={() => setSelectedRoomId(null)}
-            />
-
             {roomsByFloor.map(([floor, floorRooms]) => (
               <div key={floor} className="flex flex-col gap-2">
                 <h4 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
@@ -230,29 +360,24 @@ export function TenantMoveInDialog({
 
         {/* footer 전체 span */}
         <div className="col-span-full flex flex-col gap-2 border-t border-[var(--border)] px-5 py-3">
-          {createMutation.isError ? (
-            <p className="text-xs text-rose-500">
-              입주 처리 실패:{' '}
-              {createMutation.error instanceof Error
-                ? createMutation.error.message
-                : '알 수 없는 오류'}
-            </p>
+          {topError ? (
+            <p className="text-xs text-rose-500">입주 처리 실패: {topError}</p>
           ) : null}
           <div className="flex justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
-              disabled={createMutation.isPending}
+              disabled={submitting}
               className="rounded-lg border border-[var(--border)] bg-[var(--control)] px-3 py-2 text-sm font-medium text-[var(--foreground)] transition hover:bg-[var(--control-hover)] disabled:opacity-60"
             >
               취소
             </button>
             <button
               type="submit"
-              disabled={createMutation.isPending}
+              disabled={submitting}
               className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
             >
-              {createMutation.isPending ? '처리 중…' : '입주 확정'}
+              {submitting ? '처리 중…' : '입주 확정'}
             </button>
           </div>
         </div>
@@ -261,7 +386,7 @@ export function TenantMoveInDialog({
   )
 }
 
-/* ───── room picker tiles ───── */
+/* ───── room picker tile ───── */
 
 function RoomTile({
   room,
@@ -279,7 +404,11 @@ function RoomTile({
       type="button"
       disabled={occupied}
       onClick={onSelect}
-      title={occupied ? '이미 거주중인 방' : `${room.roomNumber}호 (${room.sizePyeong}평)`}
+      title={
+        occupied
+          ? '이미 거주중인 방'
+          : `${room.roomNumber}호 · 월세 ${numberFmt.format(room.monthlyRent)}원 / 보증금 ${numberFmt.format(room.deposit)}원`
+      }
       className={[
         'relative flex flex-col items-start gap-0.5 rounded-lg border px-2.5 py-2 text-left transition',
         occupied
@@ -296,32 +425,8 @@ function RoomTile({
           selected && !occupied ? 'text-white/80' : 'text-[var(--muted)]',
         ].join(' ')}
       >
-        {occupied ? '거주중' : `${room.sizePyeong}평`}
+        {occupied ? '거주중' : `${numberFmt.format(room.monthlyRent)}`}
       </span>
-    </button>
-  )
-}
-
-function UnassignedTile({
-  selected,
-  onSelect,
-}: {
-  selected: boolean
-  onSelect: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={[
-        'flex items-center justify-between rounded-lg border border-dashed px-3 py-2.5 text-left transition',
-        selected
-          ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--foreground)]'
-          : 'border-[var(--border)] bg-[var(--surface-strong)] text-[var(--muted)] hover:border-[var(--accent)]',
-      ].join(' ')}
-    >
-      <span className="text-sm font-medium">미배정으로 입주</span>
-      <span className="text-xs text-[var(--muted)]">방 나중에 지정</span>
     </button>
   )
 }

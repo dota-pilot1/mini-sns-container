@@ -28,15 +28,14 @@ public class CreateTenantUseCase {
 	@Transactional
 	public TenantResult execute(CreateTenantCommand command) {
 		PhoneNumber phone = PhoneNumber.of(command.phoneNumber());
-		UUID roomId = command.roomId() == null ? null : UUID.fromString(command.roomId());
+		UUID userId = command.userId() == null ? null : UUID.fromString(command.userId());
 		Instant now = Instant.now(clock);
 
 		Tenant tenant = Tenant.register(
 			TenantId.generate(),
+			userId,
 			command.name(),
 			phone,
-			roomId,
-			command.moveInDate(),
 			command.memo(),
 			now
 		);

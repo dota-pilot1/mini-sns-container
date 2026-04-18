@@ -1,13 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 
-import { tenantApi, type ListTenantsParams } from '@/features/tenant/api/tenant-api'
+import { tenantApi } from '@/features/tenant/api/tenant-api'
 
-export const tenantsQueryKey = (params: ListTenantsParams) =>
-  ['tenants', params] as const
+export const tenantsQueryKey = () => ['tenants'] as const
 
-export function useTenantsQuery(params: ListTenantsParams = {}) {
+export function useTenantsQuery() {
   return useQuery({
-    queryKey: tenantsQueryKey(params),
-    queryFn: () => tenantApi.list(params),
+    queryKey: tenantsQueryKey(),
+    queryFn: () => tenantApi.list(),
   })
 }
