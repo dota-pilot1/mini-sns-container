@@ -12,6 +12,8 @@ import { HomePage } from '@/routes/home-page'
 import { LoginPage } from '@/routes/login-page'
 import { RoomListPage } from '@/routes/room-list-page'
 import { SignupPage } from '@/routes/signup-page'
+import { TenantListPage } from '@/routes/tenant-list-page'
+import { UserListPage } from '@/routes/user-list-page'
 import { useAuthStore } from '@/shared/auth/auth-store'
 import { AppShell } from '@/shared/layouts/app-shell'
 
@@ -81,11 +83,38 @@ export const roomsRoute = createRoute({
   validateSearch: (search) => roomsSearchSchema.parse(search),
 })
 
+const usersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/users',
+  beforeLoad: requireAuth,
+  component: UserListPage,
+})
+
+/**
+ * /tenants 쿼리스트링 스키마.
+ * - selected: 드로어로 열린 입주자 id — 딥링크 & 새로고침 복원
+ */
+export const tenantsSearchSchema = z.object({
+  selected: z.string().optional().catch(undefined),
+})
+
+export type TenantsSearch = z.infer<typeof tenantsSearchSchema>
+
+const tenantsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/tenants',
+  beforeLoad: requireAuth,
+  component: TenantListPage,
+  validateSearch: (search) => tenantsSearchSchema.parse(search),
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
   signupRoute,
   roomsRoute,
+  usersRoute,
+  tenantsRoute,
 ])
 
 export const router = createRouter({
