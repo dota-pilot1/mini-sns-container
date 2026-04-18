@@ -2,16 +2,9 @@ import { useEffect, useState } from 'react'
 
 import type { RoomResponse } from '@/features/room/api/room-api'
 import type { TenantResponse } from '@/features/tenant/api/tenant-api'
-import { useChangeTenantStatus } from '@/features/tenant/model/use-change-tenant-status'
 import { useDeleteTenant } from '@/features/tenant/model/use-delete-tenant'
 import { useUpdateTenant } from '@/features/tenant/model/use-update-tenant'
-import {
-  TENANT_STATUS_DOT,
-  TENANT_STATUS_LABEL,
-  TENANT_STATUS_ORDER,
-} from '@/features/tenant/model/tenant-types'
 import { TenantForm } from '@/features/tenant/ui/tenant-form'
-import { TenantStatusBadge } from '@/features/tenant/ui/tenant-status-badge'
 import { ConfirmDialog } from '@/shared/ui/dialog'
 
 const dateFmt = new Intl.DateTimeFormat('ko-KR', {
@@ -31,7 +24,7 @@ type Mode = 'view' | 'edit'
 export function TenantDetailDrawer({ tenant, rooms, onClose }: Props) {
   const [mode, setMode] = useState<Mode>('view')
   const [confirmOpen, setConfirmOpen] = useState(false)
-  const deleteMutation = useDeleteTenant()
+  const moveOutMutation = useDeleteTenant()
   const updateMutation = useUpdateTenant()
 
   useEffect(() => {
@@ -53,8 +46,8 @@ export function TenantDetailDrawer({ tenant, rooms, onClose }: Props) {
     ? rooms.find((r) => r.roomId === tenant.roomId)?.roomNumber
     : null
 
-  const handleDelete = () => {
-    deleteMutation.mutate(tenant.tenantId, {
+  const handleMoveOut = () => {
+    moveOutMutation.mutate(tenant.tenantId, {
       onSuccess: () => {
         setConfirmOpen(false)
         onClose()
@@ -81,11 +74,10 @@ export function TenantDetailDrawer({ tenant, rooms, onClose }: Props) {
 
         {mode === 'view' ? (
           <>
-            <StatusSection tenant={tenant} />
             <InfoSection tenant={tenant} roomNumber={roomNumber ?? null} />
             <Footer
               onEdit={() => setMode('edit')}
-              onDelete={() => setConfirmOpen(true)}
+              onMoveOut={() => setConfirmOpen(true)}
             />
           </>
         ) : (
@@ -109,13 +101,13 @@ export function TenantDetailDrawer({ tenant, rooms, onClose }: Props) {
 
       <ConfirmDialog
         open={confirmOpen}
-        onClose={() => (deleteMutation.isPending ? null : setConfirmOpen(false))}
-        onConfirm={handleDelete}
-        title={`${tenant.name} 님을 삭제할까요?`}
-        description="삭제 후 목록에서 즉시 사라집니다. 서버에는 soft delete 로 기록되어 복구 가능합니다."
-        confirmLabel="삭제"
+        onClose={() => (moveOutMutation.isPending ? null : setConfirmOpen(false))}
+        onConfirm={handleMoveOut}
+        title={`${tenant.name} 님을 퇴실 처리할까요?`}
+        description="거주중 목록에서 퇴실 컬럼으로 이동합니다. 퇴실 컬럼에서 복원할 수 있습니다."
+        confirmLabel="퇴실"
         variant="danger"
-        loading={deleteMutation.isPending}
+        loading={moveOutMutation.isPending}
       />
     </div>
   )
@@ -132,14 +124,11 @@ function Header({
 }) {
   return (
     <header className="flex items-start justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
-      <div className="flex flex-col gap-1">
-        <div className="flex items-baseline gap-2">
-          <h2 className="text-2xl font-bold tracking-[-0.03em]">{tenant.name}</h2>
-          {mode === 'edit' ? (
-            <span className="text-sm text-[var(--muted)]">수정 중</span>
-          ) : null}
-        </div>
-        <TenantStatusBadge status={tenant.status} />
+      <div className="flex items-baseline gap-2">
+        <h2 className="text-2xl font-bold tracking-[-0.03em]">{tenant.name}</h2>
+        {mode === 'edit' ? (
+          <span className="text-sm text-[var(--muted)]">수정 중</span>
+        ) : null}
       </div>
       <button
         type="button"
@@ -154,52 +143,6 @@ function Header({
   )
 }
 
-function StatusSection({ tenant }: { tenant: TenantResponse }) {
-  const mutation = useChangeTenantStatus()
-
-  return (
-    <section className="px-5">
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-        상태 변경
-      </h3>
-      <div className="flex flex-wrap gap-2">
-        {TENANT_STATUS_ORDER.map((s) => {
-          const active = tenant.status === s
-          return (
-            <button
-              key={s}
-              type="button"
-              disabled={active || mutation.isPending}
-              onClick={() =>
-                mutation.mutate({ tenantId: tenant.tenantId, status: s })
-              }
-              className={[
-                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition',
-                active
-                  ? 'cursor-default border-[var(--accent)] bg-[var(--accent)] text-white'
-                  : 'border-[var(--border)] bg-[var(--control)] text-[var(--foreground)] hover:border-[var(--accent)] disabled:opacity-60',
-              ].join(' ')}
-            >
-              <span
-                className={[
-                  'inline-block h-1.5 w-1.5 rounded-full',
-                  active ? 'bg-white' : TENANT_STATUS_DOT[s],
-                ].join(' ')}
-              />
-              {TENANT_STATUS_LABEL[s]}
-            </button>
-          )
-        })}
-      </div>
-      {mutation.isError ? (
-        <p className="mt-2 text-xs text-rose-500">
-          상태 변경 실패: {mutation.error instanceof Error ? mutation.error.message : '오류'}
-        </p>
-      ) : null}
-    </section>
-  )
-}
-
 function InfoSection({
   tenant,
   roomNumber,
@@ -208,16 +151,12 @@ function InfoSection({
   roomNumber: string | null
 }) {
   return (
-    <section className="flex flex-col gap-2 border-t border-[var(--border)] px-5 py-4">
+    <section className="flex flex-col gap-2 px-5 py-2">
       <InfoRow label="연락처" value={tenant.phoneNumber} />
       <InfoRow label="방" value={roomNumber ? `${roomNumber}호` : '—'} />
       <InfoRow
         label="입실일"
         value={tenant.moveInDate ? dateOnlyFmt.format(new Date(tenant.moveInDate)) : '—'}
-      />
-      <InfoRow
-        label="퇴실일"
-        value={tenant.moveOutDate ? dateOnlyFmt.format(new Date(tenant.moveOutDate)) : '—'}
       />
       <InfoRow label="메모" value={tenant.memo ?? '—'} />
 
@@ -248,10 +187,10 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 function Footer({
   onEdit,
-  onDelete,
+  onMoveOut,
 }: {
   onEdit: () => void
-  onDelete: () => void
+  onMoveOut: () => void
 }) {
   return (
     <footer className="mt-auto flex gap-2 border-t border-[var(--border)] px-5 py-3">
@@ -264,10 +203,10 @@ function Footer({
       </button>
       <button
         type="button"
-        onClick={onDelete}
+        onClick={onMoveOut}
         className="flex-1 rounded-lg border border-rose-500/40 bg-rose-500/5 px-3 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10"
       >
-        삭제
+        퇴실
       </button>
     </footer>
   )

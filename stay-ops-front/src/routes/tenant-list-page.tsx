@@ -294,7 +294,7 @@ function ActiveTenantCard({
   onMoveOut: () => void
 }) {
   return (
-    <div className="group flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-strong)] transition hover:border-[var(--accent)]">
+    <div className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-strong)] transition hover:border-[var(--accent)]">
       <button
         type="button"
         onClick={onOpen}
