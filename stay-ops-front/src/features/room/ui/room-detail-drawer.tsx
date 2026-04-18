@@ -3,14 +3,15 @@ import { useEffect, useState } from 'react'
 import type { RoomResponse } from '@/features/room/api/room-api'
 import { useChangeRoomStatus } from '@/features/room/model/use-change-room-status'
 import { useDeleteRoom } from '@/features/room/model/use-delete-room'
+import { useUpdateRoom } from '@/features/room/model/use-update-room'
 import {
   ROOM_OPTION_LABEL,
   ROOM_STATUS_DOT,
   ROOM_STATUS_LABEL,
   ROOM_STATUS_ORDER,
   ROOM_TYPE_LABEL,
-  type RoomStatus,
 } from '@/features/room/model/room-types'
+import { RoomForm } from '@/features/room/ui/room-form'
 import { RoomStatusBadge } from '@/features/room/ui/room-status-badge'
 import { ConfirmDialog } from '@/shared/ui/dialog'
 
@@ -25,19 +26,28 @@ type Props = {
   onClose: () => void
 }
 
+type Mode = 'view' | 'edit'
+
 export function RoomDetailDrawer({ room, onClose }: Props) {
+  const [mode, setMode] = useState<Mode>('view')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const deleteMutation = useDeleteRoom()
+  const updateMutation = useUpdateRoom()
 
-  // ESC 로 닫기 — 단 confirm 열려있으면 confirm이 먼저 먹음
+  // 다른 방으로 전환되면 view 모드로 리셋
   useEffect(() => {
-    if (!room || confirmOpen) return
+    setMode('view')
+  }, [room?.roomId])
+
+  // ESC 로 닫기 — confirm 열려있거나 edit 모드면 drawer 닫히지 않음
+  useEffect(() => {
+    if (!room || confirmOpen || mode === 'edit') return
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [room, confirmOpen, onClose])
+  }, [room, confirmOpen, mode, onClose])
 
   if (!room) return null
 
@@ -56,8 +66,9 @@ export function RoomDetailDrawer({ room, onClose }: Props) {
       <button
         type="button"
         aria-label="닫기"
-        onClick={onClose}
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={mode === 'edit' ? undefined : onClose}
+        disabled={mode === 'edit'}
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm disabled:cursor-default"
       />
 
       {/* Panel */}
@@ -66,10 +77,33 @@ export function RoomDetailDrawer({ room, onClose }: Props) {
         aria-label={`방 ${room.roomNumber} 상세`}
         className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col gap-4 overflow-y-auto border-l border-[var(--border)] bg-[var(--surface)] shadow-[-20px_0_60px_rgba(0,0,0,0.2)]"
       >
-        <Header room={room} onClose={onClose} />
-        <StatusSection room={room} />
-        <InfoSection room={room} />
-        <Footer onDelete={() => setConfirmOpen(true)} />
+        <Header room={room} onClose={onClose} mode={mode} />
+
+        {mode === 'view' ? (
+          <>
+            <StatusSection room={room} />
+            <InfoSection room={room} />
+            <Footer
+              onEdit={() => setMode('edit')}
+              onDelete={() => setConfirmOpen(true)}
+            />
+          </>
+        ) : (
+          <section className="px-5 pb-5">
+            <RoomForm
+              initial={room}
+              submitting={updateMutation.isPending}
+              submitLabel="저장"
+              onCancel={() => setMode('view')}
+              onSubmit={async (payload) => {
+                await updateMutation.mutateAsync(
+                  { roomId: room.roomId, body: payload },
+                  { onSuccess: () => setMode('view') },
+                )
+              }}
+            />
+          </section>
+        )}
       </aside>
 
       <ConfirmDialog
@@ -91,9 +125,11 @@ export function RoomDetailDrawer({ room, onClose }: Props) {
 function Header({
   room,
   onClose,
+  mode,
 }: {
   room: RoomResponse
   onClose: () => void
+  mode: Mode
 }) {
   return (
     <header className="flex items-start justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
@@ -102,15 +138,18 @@ function Header({
           <h2 className="text-2xl font-bold tracking-[-0.03em]">
             {room.roomNumber}
           </h2>
-          <span className="text-sm text-[var(--muted)]">호</span>
+          <span className="text-sm text-[var(--muted)]">
+            {mode === 'edit' ? '수정 중' : '호'}
+          </span>
         </div>
         <RoomStatusBadge status={room.status} />
       </div>
       <button
         type="button"
         onClick={onClose}
+        disabled={mode === 'edit'}
         aria-label="닫기"
-        className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--muted)] transition hover:bg-[var(--control)] hover:text-[var(--foreground)]"
+        className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--muted)] transition hover:bg-[var(--control)] hover:text-[var(--foreground)] disabled:opacity-40"
       >
         ✕
       </button>
@@ -224,14 +263,19 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 /* ───── Footer ───── */
 
-function Footer({ onDelete }: { onDelete: () => void }) {
+function Footer({
+  onEdit,
+  onDelete,
+}: {
+  onEdit: () => void
+  onDelete: () => void
+}) {
   return (
     <footer className="mt-auto flex gap-2 border-t border-[var(--border)] px-5 py-3">
       <button
         type="button"
-        disabled
-        title="수정 UI 준비 중"
-        className="flex-1 cursor-not-allowed rounded-lg border border-[var(--border)] bg-[var(--control)] px-3 py-2 text-sm font-medium text-[var(--muted)]"
+        onClick={onEdit}
+        className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--control)] px-3 py-2 text-sm font-medium text-[var(--foreground)] transition hover:border-[var(--accent)] hover:bg-[var(--control-hover)]"
       >
         수정
       </button>
@@ -245,6 +289,3 @@ function Footer({ onDelete }: { onDelete: () => void }) {
     </footer>
   )
 }
-
-// Re-export for consumers
-export type { RoomStatus }
