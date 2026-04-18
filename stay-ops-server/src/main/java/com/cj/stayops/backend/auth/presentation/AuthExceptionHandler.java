@@ -11,6 +11,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.cj.stayops.backend.auth.domain.exception.InvalidCredentialsException;
 import com.cj.stayops.backend.auth.domain.exception.WeakPasswordException;
 import com.cj.stayops.backend.auth.presentation.dto.ErrorResponse;
+import com.cj.stayops.backend.room.domain.exception.DuplicateRoomNumberException;
+import com.cj.stayops.backend.room.domain.exception.InvalidRoomFieldException;
+import com.cj.stayops.backend.room.domain.exception.RoomNotFoundException;
 import com.cj.stayops.backend.user.domain.exception.DuplicateEmailException;
 import com.cj.stayops.backend.user.domain.exception.InvalidEmailException;
 
@@ -62,5 +65,29 @@ public class AuthExceptionHandler {
 		// e.getMessage() 는 디버깅용. 사용자에게는 일관된 메시지 반환 (계정 enumeration 방지).
 		return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
 			.body(ErrorResponse.of("INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않습니다."));
+	}
+
+	/** 방 필드 도메인 검증 실패 → 400 Bad Request. */
+	@ExceptionHandler(InvalidRoomFieldException.class)
+	public ResponseEntity<ErrorResponse> handleInvalidRoomField(InvalidRoomFieldException e) {
+		List<ErrorResponse.FieldError> errors = List.of(
+			new ErrorResponse.FieldError(e.field(), e.getMessage())
+		);
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+			.body(ErrorResponse.of("INVALID_ROOM_FIELD", e.getMessage(), errors));
+	}
+
+	/** 호수 중복 → 409 Conflict. */
+	@ExceptionHandler(DuplicateRoomNumberException.class)
+	public ResponseEntity<ErrorResponse> handleDuplicateRoomNumber(DuplicateRoomNumberException e) {
+		return ResponseEntity.status(HttpStatus.CONFLICT)
+			.body(ErrorResponse.of("DUPLICATE_ROOM_NUMBER", e.getMessage()));
+	}
+
+	/** 존재하지 않는 방 → 404 Not Found. */
+	@ExceptionHandler(RoomNotFoundException.class)
+	public ResponseEntity<ErrorResponse> handleRoomNotFound(RoomNotFoundException e) {
+		return ResponseEntity.status(HttpStatus.NOT_FOUND)
+			.body(ErrorResponse.of("ROOM_NOT_FOUND", e.getMessage()));
 	}
 }

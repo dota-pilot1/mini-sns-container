@@ -8,6 +8,7 @@ import {
 
 import { HomePage } from '@/routes/home-page'
 import { LoginPage } from '@/routes/login-page'
+import { RoomListPage } from '@/routes/room-list-page'
 import { SignupPage } from '@/routes/signup-page'
 import { useAuthStore } from '@/shared/auth/auth-store'
 import { AppShell } from '@/shared/layouts/app-shell'
@@ -53,7 +54,19 @@ const signupRoute = createRoute({
   component: SignupPage,
 })
 
-const routeTree = rootRoute.addChildren([indexRoute, loginRoute, signupRoute])
+const roomsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/rooms',
+  beforeLoad: requireAuth,
+  component: RoomListPage,
+})
+
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  loginRoute,
+  signupRoute,
+  roomsRoute,
+])
 
 export const router = createRouter({
   routeTree,

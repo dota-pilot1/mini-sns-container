@@ -11,7 +11,6 @@ export function AppShell({ children }: PropsWithChildren) {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
-  const { t } = useTranslation()
   const theme = useThemeStore((state) => state.theme)
   const user = useAuthStore((s) => s.user)
   const clearAuth = useAuthStore((s) => s.clear)
@@ -27,41 +26,40 @@ export function AppShell({ children }: PropsWithChildren) {
   }
 
   return (
-    <div className="mx-auto flex min-h-svh w-full max-w-7xl flex-col px-4 py-4 md:px-6 md:py-6">
-      <header className="sticky top-4 z-10 rounded-[2rem] border border-[var(--border)] bg-[var(--surface)] px-4 py-4 shadow-[0_20px_60px_rgba(0,0,0,0.08)] backdrop-blur md:px-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="grid gap-1">
-            <Link to={user ? '/' : '/login'} className="text-lg font-semibold tracking-[-0.04em]">
-              Stay Ops
-            </Link>
-            <p className="text-sm text-[var(--muted)]">{t('common:tagline')}</p>
-          </div>
+    <div className="flex min-h-svh w-full flex-col bg-[var(--background)]">
+      <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur">
+        <div className="flex h-14 items-center gap-4 px-4 md:px-6">
+          {/* Left: compact title */}
+          <Link
+            to={user ? '/' : '/login'}
+            className="text-sm font-semibold tracking-[-0.02em] text-[var(--foreground)]"
+          >
+            StayOps
+          </Link>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="inline-flex rounded-full border border-[var(--border)] bg-[var(--control)] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
-              {user ? (
-                <>
-                  <NavLink active={pathname === '/'} to="/">
-                    {t('nav:home')}
-                  </NavLink>
-                </>
-              ) : (
-                <>
-                  <NavLink active={pathname === '/login'} to="/login">
-                    {t('nav:login')}
-                  </NavLink>
-                  <NavLink active={pathname === '/signup'} to="/signup">
-                    {t('nav:signup')}
-                  </NavLink>
-                </>
-              )}
-            </div>
+          {/* Center: main nav (only when logged in) */}
+          {user ? (
+            <nav className="mx-auto inline-flex rounded-full border border-[var(--border)] bg-[var(--control)] p-1">
+              <NavLink active={pathname === '/'} to="/">
+                대시보드
+              </NavLink>
+              <NavLink
+                active={pathname.startsWith('/rooms')}
+                to="/rooms"
+              >
+                방관리
+              </NavLink>
+            </nav>
+          ) : (
+            <div className="ml-auto" />
+          )}
 
-            <div className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--control)] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)]">
+          {/* Right: utilities */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--control)] p-1">
               <LanguageSelect />
               <ThemeToggle />
             </div>
-
             {user ? (
               <UserMenu name={user.name} email={user.email} onLogout={handleLogout} />
             ) : null}
@@ -69,7 +67,7 @@ export function AppShell({ children }: PropsWithChildren) {
         </div>
       </header>
 
-      <main className="flex-1 py-6 md:py-10">{children}</main>
+      <main className="flex-1 px-4 py-4 md:px-6 md:py-6">{children}</main>
     </div>
   )
 }
@@ -89,7 +87,6 @@ function UserMenu({
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  // 외부 클릭 시 닫기
   useEffect(() => {
     if (!open) return
     function handleClick(e: MouseEvent) {
@@ -110,19 +107,17 @@ function UserMenu({
 
   return (
     <div className="relative" ref={ref}>
-      {/* Avatar Button */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-bold text-white shadow-md transition hover:opacity-90"
+        className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--accent)] text-xs font-bold text-white shadow-sm transition hover:opacity-90"
         aria-label={name}
       >
         {initials}
       </button>
 
-      {/* Dropdown */}
       {open ? (
-        <div className="absolute right-0 top-12 z-20 min-w-56 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-[0_20px_60px_rgba(0,0,0,0.15)]">
+        <div className="absolute right-0 top-11 z-30 min-w-56 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[0_20px_60px_rgba(0,0,0,0.15)]">
           <div className="border-b border-[var(--border)] px-4 py-3">
             <p className="text-sm font-semibold">{name}</p>
             <p className="mt-0.5 text-xs text-[var(--muted)]">{email}</p>
@@ -168,7 +163,7 @@ function LogoutIcon() {
 
 type NavLinkProps = PropsWithChildren<{
   active: boolean
-  to: '/' | '/login' | '/signup'
+  to: '/' | '/rooms' | '/login' | '/signup'
 }>
 
 function NavLink({ active, children, to }: NavLinkProps) {
@@ -176,9 +171,9 @@ function NavLink({ active, children, to }: NavLinkProps) {
     <Link
       to={to}
       className={[
-        'inline-flex min-w-20 items-center justify-center rounded-full px-4 py-2.5 text-sm font-semibold tracking-[-0.02em] transition duration-200',
+        'inline-flex min-w-24 items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium tracking-[-0.01em] transition',
         active
-          ? 'bg-[image:var(--control-active)] text-[#fffaf0]! shadow-[0_10px_24px_rgba(0,0,0,0.18)] [text-shadow:0_1px_1px_rgba(0,0,0,0.28)]'
+          ? 'bg-[var(--accent)] text-white shadow-sm'
           : 'text-[var(--muted)] hover:bg-[var(--control-hover)] hover:text-[var(--foreground)]',
       ].join(' ')}
     >

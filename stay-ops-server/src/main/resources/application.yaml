@@ -35,3 +35,8 @@ app:
     secret: ${JWT_SECRET:dev-only-change-me-please-this-is-a-long-enough-hs256-secret-do-not-use-in-prod-0123456789}
     access-token-ttl-seconds: 1800
     issuer: stay-ops
+
+stay-ops:
+  dev:
+    # 방이 0개일 때만 60개(6층/7층 각 30개) 시드 데이터 자동 삽입. prod에서는 false로.
+    seed-rooms: ${STAY_OPS_SEED_ROOMS:true}
