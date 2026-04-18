@@ -9,7 +9,12 @@ import {
 } from '@/features/room/model/room-types'
 import { RoomCard } from '@/features/room/ui/room-card'
 
-export function RoomKanbanView({ rooms }: { rooms: RoomResponse[] }) {
+type Props = {
+  rooms: RoomResponse[]
+  onSelect?: (roomId: string) => void
+}
+
+export function RoomKanbanView({ rooms, onSelect }: Props) {
   const grouped = useMemo(() => {
     const out: Record<RoomStatus, RoomResponse[]> = {
       VACANT: [],
@@ -32,6 +37,7 @@ export function RoomKanbanView({ rooms }: { rooms: RoomResponse[] }) {
           key={status}
           status={status}
           rooms={grouped[status]}
+          onSelect={onSelect}
         />
       ))}
     </div>
@@ -41,9 +47,11 @@ export function RoomKanbanView({ rooms }: { rooms: RoomResponse[] }) {
 function KanbanColumn({
   status,
   rooms,
+  onSelect,
 }: {
   status: RoomStatus
   rooms: RoomResponse[]
+  onSelect?: (roomId: string) => void
 }) {
   return (
     <section className="flex min-w-[15rem] flex-1 flex-col gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-2">
@@ -68,7 +76,9 @@ function KanbanColumn({
             없음
           </div>
         ) : (
-          rooms.map((room) => <RoomCard key={room.roomId} room={room} />)
+          rooms.map((room) => (
+            <RoomCard key={room.roomId} room={room} onClick={onSelect} />
+          ))
         )}
       </div>
     </section>

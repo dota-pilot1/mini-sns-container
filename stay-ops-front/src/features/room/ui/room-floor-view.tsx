@@ -1,7 +1,12 @@
 import type { RoomResponse } from '@/features/room/api/room-api'
 import { RoomCard } from '@/features/room/ui/room-card'
 
-export function RoomFloorView({ rooms }: { rooms: RoomResponse[] }) {
+type Props = {
+  rooms: RoomResponse[]
+  onSelect?: (roomId: string) => void
+}
+
+export function RoomFloorView({ rooms, onSelect }: Props) {
   const byFloor = groupByFloor(rooms)
   const floors = Object.keys(byFloor)
     .map(Number)
@@ -29,7 +34,7 @@ export function RoomFloorView({ rooms }: { rooms: RoomResponse[] }) {
           </h2>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
             {byFloor[floor].map((room) => (
-              <RoomCard key={room.roomId} room={room} />
+              <RoomCard key={room.roomId} room={room} onClick={onSelect} />
             ))}
           </div>
         </section>

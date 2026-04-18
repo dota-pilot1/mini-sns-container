@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 
 import { useRoomsQuery } from '@/features/room/model/use-rooms'
+import { RoomDetailDrawer } from '@/features/room/ui/room-detail-drawer'
 import { RoomFloorView } from '@/features/room/ui/room-floor-view'
 import { RoomKanbanView } from '@/features/room/ui/room-kanban-view'
 import {
@@ -20,6 +21,7 @@ const VIEW_TABS: { id: ViewMode; label: string }[] = [
 export function RoomListPage() {
   const [view, setView] = useState<ViewMode>('floor')
   const [filter, setFilter] = useState<RoomFilter>({ floor: null, status: null })
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
 
   const { data = [], isLoading, isError, error } = useRoomsQuery()
 
@@ -30,6 +32,11 @@ export function RoomListPage() {
       return true
     })
   }, [data, filter])
+
+  const selectedRoom = useMemo(
+    () => (selectedRoomId ? data.find((r) => r.roomId === selectedRoomId) ?? null : null),
+    [data, selectedRoomId],
+  )
 
   return (
     <div className="-mx-4 -my-4 flex min-h-[calc(100svh-3.5rem)] md:-mx-6 md:-my-6">
@@ -72,13 +79,18 @@ export function RoomListPage() {
             message={error instanceof Error ? error.message : '알 수 없는 오류'}
           />
         ) : view === 'floor' ? (
-          <RoomFloorView rooms={filtered} />
+          <RoomFloorView rooms={filtered} onSelect={setSelectedRoomId} />
         ) : view === 'table' ? (
-          <RoomTableView rooms={filtered} />
+          <RoomTableView rooms={filtered} onSelect={setSelectedRoomId} />
         ) : (
-          <RoomKanbanView rooms={filtered} />
+          <RoomKanbanView rooms={filtered} onSelect={setSelectedRoomId} />
         )}
       </section>
+
+      <RoomDetailDrawer
+        room={selectedRoom}
+        onClose={() => setSelectedRoomId(null)}
+      />
     </div>
   )
 }
@@ -103,4 +115,3 @@ function ErrorState({ message }: { message: string }) {
     </div>
   )
 }
-

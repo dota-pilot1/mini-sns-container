@@ -34,7 +34,12 @@ function relative(iso: string): string {
   return relativeTime.format(Math.round(months), 'month')
 }
 
-export function RoomTableView({ rooms }: { rooms: RoomResponse[] }) {
+type Props = {
+  rooms: RoomResponse[]
+  onSelect?: (roomId: string) => void
+}
+
+export function RoomTableView({ rooms, onSelect }: Props) {
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'roomNumber', desc: false },
   ])
@@ -195,7 +200,11 @@ export function RoomTableView({ rooms }: { rooms: RoomResponse[] }) {
           {table.getRowModel().rows.map((row) => (
             <tr
               key={row.id}
-              className="border-t border-[var(--border)] transition hover:bg-[var(--control)]"
+              onClick={() => onSelect?.(row.original.roomId)}
+              className={[
+                'border-t border-[var(--border)] transition hover:bg-[var(--control)]',
+                onSelect ? 'cursor-pointer' : '',
+              ].join(' ')}
             >
               {row.getVisibleCells().map((cell) => {
                 const align =

@@ -4,9 +4,18 @@ import { RoomStatusBadge } from '@/features/room/ui/room-status-badge'
 
 const krw = new Intl.NumberFormat('ko-KR')
 
-export function RoomCard({ room }: { room: RoomResponse }) {
+type Props = {
+  room: RoomResponse
+  onClick?: (roomId: string) => void
+}
+
+export function RoomCard({ room, onClick }: Props) {
   return (
-    <div className="group flex min-w-[9rem] flex-col gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 shadow-sm transition hover:border-[var(--accent)] hover:shadow-md">
+    <button
+      type="button"
+      onClick={() => onClick?.(room.roomId)}
+      className="group flex min-w-[9rem] flex-col gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-left shadow-sm transition hover:border-[var(--accent)] hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+    >
       <div className="flex items-center justify-between gap-2">
         <span className="text-base font-bold tracking-[-0.02em] text-[var(--foreground)]">
           {room.roomNumber}
@@ -20,6 +29,6 @@ export function RoomCard({ room }: { room: RoomResponse }) {
       <div className="text-xs font-medium text-[var(--foreground)]">
         월 {krw.format(room.monthlyRent)}원
       </div>
-    </div>
+    </button>
   )
 }
