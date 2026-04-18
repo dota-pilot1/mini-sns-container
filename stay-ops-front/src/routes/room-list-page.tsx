@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 
 import { useRoomsQuery } from '@/features/room/model/use-rooms'
 import { RoomFloorView } from '@/features/room/ui/room-floor-view'
+import { RoomKanbanView } from '@/features/room/ui/room-kanban-view'
 import {
   RoomSidebar,
   type RoomFilter,
@@ -75,9 +76,7 @@ export function RoomListPage() {
         ) : view === 'table' ? (
           <RoomTableView rooms={filtered} />
         ) : (
-          <PlaceholderView
-            label={VIEW_TABS.find((t) => t.id === view)?.label ?? ''}
-          />
+          <RoomKanbanView rooms={filtered} />
         )}
       </section>
     </div>
@@ -105,10 +104,3 @@ function ErrorState({ message }: { message: string }) {
   )
 }
 
-function PlaceholderView({ label }: { label: string }) {
-  return (
-    <div className="grid place-items-center rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)] py-24 text-sm text-[var(--muted)]">
-      {label} 뷰 — 준비 중입니다
-    </div>
-  )
-}
