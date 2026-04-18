@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 import type { RoomResponse } from '@/features/room/api/room-api'
 import { useChangeRoomStatus } from '@/features/room/model/use-change-room-status'
+import { useDeleteRoom } from '@/features/room/model/use-delete-room'
 import {
   ROOM_OPTION_LABEL,
   ROOM_STATUS_DOT,
@@ -11,6 +12,7 @@ import {
   type RoomStatus,
 } from '@/features/room/model/room-types'
 import { RoomStatusBadge } from '@/features/room/ui/room-status-badge'
+import { ConfirmDialog } from '@/shared/ui/dialog'
 
 const krw = new Intl.NumberFormat('ko-KR')
 const dateFmt = new Intl.DateTimeFormat('ko-KR', {
@@ -24,17 +26,29 @@ type Props = {
 }
 
 export function RoomDetailDrawer({ room, onClose }: Props) {
-  // ESC 로 닫기
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const deleteMutation = useDeleteRoom()
+
+  // ESC 로 닫기 — 단 confirm 열려있으면 confirm이 먼저 먹음
   useEffect(() => {
-    if (!room) return
+    if (!room || confirmOpen) return
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [room, onClose])
+  }, [room, confirmOpen, onClose])
 
   if (!room) return null
+
+  const handleDelete = () => {
+    deleteMutation.mutate(room.roomId, {
+      onSuccess: () => {
+        setConfirmOpen(false)
+        onClose()
+      },
+    })
+  }
 
   return (
     <div className="fixed inset-0 z-40">
@@ -55,8 +69,19 @@ export function RoomDetailDrawer({ room, onClose }: Props) {
         <Header room={room} onClose={onClose} />
         <StatusSection room={room} />
         <InfoSection room={room} />
-        <Footer />
+        <Footer onDelete={() => setConfirmOpen(true)} />
       </aside>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => (deleteMutation.isPending ? null : setConfirmOpen(false))}
+        onConfirm={handleDelete}
+        title={`${room.roomNumber}호를 삭제할까요?`}
+        description="삭제 후 목록에서 즉시 사라집니다. 서버에는 soft delete 로 기록되어 복구 가능합니다."
+        confirmLabel="삭제"
+        variant="danger"
+        loading={deleteMutation.isPending}
+      />
     </div>
   )
 }
@@ -199,7 +224,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 /* ───── Footer ───── */
 
-function Footer() {
+function Footer({ onDelete }: { onDelete: () => void }) {
   return (
     <footer className="mt-auto flex gap-2 border-t border-[var(--border)] px-5 py-3">
       <button
@@ -212,9 +237,8 @@ function Footer() {
       </button>
       <button
         type="button"
-        disabled
-        title="삭제 UI 준비 중"
-        className="flex-1 cursor-not-allowed rounded-lg border border-rose-500/40 bg-rose-500/5 px-3 py-2 text-sm font-medium text-rose-500/60"
+        onClick={onDelete}
+        className="flex-1 rounded-lg border border-rose-500/40 bg-rose-500/5 px-3 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10"
       >
         삭제
       </button>
