@@ -5,6 +5,7 @@ import {
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
+  type RowSelectionState,
   type SortingState,
 } from '@tanstack/react-table'
 import { useMemo, useState } from 'react'
@@ -15,6 +16,7 @@ import {
   ROOM_STATUS_ORDER,
   ROOM_TYPE_LABEL,
 } from '@/features/room/model/room-types'
+import { RoomBulkActionBar } from '@/features/room/ui/room-bulk-action-bar'
 import { RoomStatusBadge } from '@/features/room/ui/room-status-badge'
 
 const krw = new Intl.NumberFormat('ko-KR')
@@ -43,9 +45,35 @@ export function RoomTableView({ rooms, onSelect }: Props) {
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'roomNumber', desc: false },
   ])
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
   const columns = useMemo<ColumnDef<RoomResponse, unknown>[]>(
     () => [
+      {
+        id: 'select',
+        header: ({ table }) => (
+          <Checkbox
+            checked={
+              table.getIsAllPageRowsSelected()
+                ? true
+                : table.getIsSomePageRowsSelected()
+                  ? 'indeterminate'
+                  : false
+            }
+            onChange={(v) => table.toggleAllPageRowsSelected(!!v)}
+            aria-label="전체 선택"
+          />
+        ),
+        cell: ({ row }) => (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onChange={(v) => row.toggleSelected(!!v)}
+            aria-label={`${row.original.roomNumber} 선택`}
+          />
+        ),
+        size: 40,
+        enableSorting: false,
+      },
       ch.accessor('roomNumber', {
         header: '호수',
         cell: (info) => (
@@ -136,11 +164,16 @@ export function RoomTableView({ rooms, onSelect }: Props) {
   const table = useReactTable({
     data: rooms,
     columns,
-    state: { sorting },
+    state: { sorting, rowSelection },
     onSortingChange: setSorting,
+    onRowSelectionChange: setRowSelection,
+    getRowId: (row) => row.roomId,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    enableRowSelection: true,
   })
+
+  const selectedIds = Object.keys(rowSelection).filter((id) => rowSelection[id])
 
   if (rooms.length === 0) {
     return (
@@ -151,82 +184,125 @@ export function RoomTableView({ rooms, onSelect }: Props) {
   }
 
   return (
-    <div className="overflow-auto rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-      <table className="w-full border-collapse text-sm">
-        <thead className="sticky top-0 z-10 bg-[var(--surface)] shadow-[0_1px_0_var(--border)]">
-          {table.getHeaderGroups().map((hg) => (
-            <tr key={hg.id}>
-              {hg.headers.map((header) => {
-                const canSort = header.column.getCanSort()
-                const sort = header.column.getIsSorted()
-                const align =
-                  (header.column.columnDef.meta as { align?: string } | undefined)
-                    ?.align === 'right'
-                    ? 'text-right'
-                    : 'text-left'
-                return (
-                  <th
-                    key={header.id}
-                    style={{ width: header.getSize() }}
-                    className={[
-                      'px-3 py-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]',
-                      align,
-                      canSort ? 'cursor-pointer select-none' : '',
-                    ].join(' ')}
-                    onClick={
-                      canSort
-                        ? header.column.getToggleSortingHandler()
-                        : undefined
-                    }
-                  >
-                    <span className="inline-flex items-center gap-1">
-                      {flexRender(
-                        header.column.columnDef.header,
-                        header.getContext(),
-                      )}
-                      {canSort ? (
-                        <SortIcon
-                          dir={sort === 'asc' ? 'asc' : sort === 'desc' ? 'desc' : null}
-                        />
-                      ) : null}
-                    </span>
-                  </th>
-                )
-              })}
-            </tr>
-          ))}
-        </thead>
-        <tbody>
-          {table.getRowModel().rows.map((row) => (
-            <tr
-              key={row.id}
-              onClick={() => onSelect?.(row.original.roomId)}
-              className={[
-                'border-t border-[var(--border)] transition hover:bg-[var(--control)]',
-                onSelect ? 'cursor-pointer' : '',
-              ].join(' ')}
-            >
-              {row.getVisibleCells().map((cell) => {
-                const align =
-                  (cell.column.columnDef.meta as { align?: string } | undefined)
-                    ?.align === 'right'
-                    ? 'text-right'
-                    : 'text-left'
-                return (
-                  <td
-                    key={cell.id}
-                    style={{ width: cell.column.getSize() }}
-                    className={['px-3 py-2', align].join(' ')}
-                  >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                )
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="flex flex-col gap-4">
+      <div className="overflow-auto rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+        <table className="w-full border-collapse text-sm">
+          <thead className="sticky top-0 z-10 bg-[var(--surface)] shadow-[0_1px_0_var(--border)]">
+            {table.getHeaderGroups().map((hg) => (
+              <tr key={hg.id}>
+                {hg.headers.map((header) => {
+                  const canSort = header.column.getCanSort()
+                  const sort = header.column.getIsSorted()
+                  const align =
+                    (header.column.columnDef.meta as { align?: string } | undefined)
+                      ?.align === 'right'
+                      ? 'text-right'
+                      : 'text-left'
+                  return (
+                    <th
+                      key={header.id}
+                      style={{ width: header.getSize() }}
+                      className={[
+                        'px-3 py-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]',
+                        align,
+                        canSort ? 'cursor-pointer select-none' : '',
+                      ].join(' ')}
+                      onClick={
+                        canSort
+                          ? header.column.getToggleSortingHandler()
+                          : undefined
+                      }
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        {flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )}
+                        {canSort ? (
+                          <SortIcon
+                            dir={sort === 'asc' ? 'asc' : sort === 'desc' ? 'desc' : null}
+                          />
+                        ) : null}
+                      </span>
+                    </th>
+                  )
+                })}
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.map((row) => (
+              <tr
+                key={row.id}
+                className={[
+                  'border-t border-[var(--border)] transition hover:bg-[var(--control)]',
+                  row.getIsSelected() ? 'bg-[var(--ring)]/20' : '',
+                ].join(' ')}
+              >
+                {row.getVisibleCells().map((cell) => {
+                  const align =
+                    (cell.column.columnDef.meta as { align?: string } | undefined)
+                      ?.align === 'right'
+                      ? 'text-right'
+                      : 'text-left'
+                  const isSelectCell = cell.column.id === 'select'
+                  return (
+                    <td
+                      key={cell.id}
+                      style={{ width: cell.column.getSize() }}
+                      onClick={
+                        isSelectCell
+                          ? (e) => e.stopPropagation()
+                          : () => onSelect?.(row.original.roomId)
+                      }
+                      className={[
+                        'px-3 py-2',
+                        align,
+                        isSelectCell ? '' : onSelect ? 'cursor-pointer' : '',
+                      ].join(' ')}
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {selectedIds.length > 0 ? (
+        <RoomBulkActionBar
+          selectedIds={selectedIds}
+          onClear={() => setRowSelection({})}
+        />
+      ) : null}
     </div>
+  )
+}
+
+/* ───── primitives ───── */
+
+function Checkbox({
+  checked,
+  onChange,
+  ...rest
+}: {
+  checked: boolean | 'indeterminate'
+  onChange: (next: boolean) => void
+} & React.HTMLAttributes<HTMLInputElement>) {
+  return (
+    <input
+      type="checkbox"
+      checked={checked === true}
+      ref={(el) => {
+        if (el) el.indeterminate = checked === 'indeterminate'
+      }}
+      onChange={(e) => onChange(e.target.checked)}
+      onClick={(e) => e.stopPropagation()}
+      className="h-4 w-4 cursor-pointer accent-[var(--accent)]"
+      {...rest}
+    />
   )
 }
 
