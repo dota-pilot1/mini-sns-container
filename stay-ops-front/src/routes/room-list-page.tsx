@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 
 import { useRoomsQuery } from '@/features/room/model/use-rooms'
+import { RoomCreateModal } from '@/features/room/ui/room-create-modal'
 import { RoomDetailDrawer } from '@/features/room/ui/room-detail-drawer'
 import { RoomFloorView } from '@/features/room/ui/room-floor-view'
 import { RoomKanbanView } from '@/features/room/ui/room-kanban-view'
@@ -22,6 +23,7 @@ export function RoomListPage() {
   const [view, setView] = useState<ViewMode>('floor')
   const [filter, setFilter] = useState<RoomFilter>({ floor: null, status: null })
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
 
   const { data = [], isLoading, isError, error } = useRoomsQuery()
 
@@ -40,7 +42,12 @@ export function RoomListPage() {
 
   return (
     <div className="-mx-4 -my-4 flex min-h-[calc(100svh-3.5rem)] md:-mx-6 md:-my-6">
-      <RoomSidebar rooms={data} filter={filter} onChange={setFilter} />
+      <RoomSidebar
+        rooms={data}
+        filter={filter}
+        onChange={setFilter}
+        onCreateClick={() => setCreateOpen(true)}
+      />
 
       <section className="flex flex-1 flex-col gap-4 px-4 py-4 md:px-6 md:py-6">
         <header className="flex flex-wrap items-center justify-between gap-3">
@@ -90,6 +97,12 @@ export function RoomListPage() {
       <RoomDetailDrawer
         room={selectedRoom}
         onClose={() => setSelectedRoomId(null)}
+      />
+
+      <RoomCreateModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={(roomId) => setSelectedRoomId(roomId)}
       />
     </div>
   )

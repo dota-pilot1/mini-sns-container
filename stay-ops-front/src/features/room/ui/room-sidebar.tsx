@@ -15,9 +15,10 @@ type Props = {
   rooms: RoomResponse[]
   filter: RoomFilter
   onChange: (next: RoomFilter) => void
+  onCreateClick?: () => void
 }
 
-export function RoomSidebar({ rooms, filter, onChange }: Props) {
+export function RoomSidebar({ rooms, filter, onChange, onCreateClick }: Props) {
   const total = rooms.length
   const byFloor = groupCount(rooms, (r) => r.floor)
   const byStatus = groupCount(rooms, (r) => r.status)
@@ -86,9 +87,9 @@ export function RoomSidebar({ rooms, filter, onChange }: Props) {
       <div className="mt-auto pt-2">
         <button
           type="button"
-          disabled
-          title="등록 UI 준비 중"
-          className="flex w-full cursor-not-allowed items-center justify-center gap-1 rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-semibold text-white opacity-50"
+          onClick={onCreateClick}
+          disabled={!onCreateClick}
+          className="flex w-full items-center justify-center gap-1 rounded-lg bg-[var(--accent)] px-3 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           + 방 등록
         </button>
