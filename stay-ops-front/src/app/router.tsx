@@ -5,7 +5,9 @@ import {
   Outlet,
   redirect,
 } from '@tanstack/react-router'
+import { z } from 'zod'
 
+import { ROOM_STATUSES } from '@/features/room/model/room-types'
 import { HomePage } from '@/routes/home-page'
 import { LoginPage } from '@/routes/login-page'
 import { RoomListPage } from '@/routes/room-list-page'
@@ -54,11 +56,29 @@ const signupRoute = createRoute({
   component: SignupPage,
 })
 
-const roomsRoute = createRoute({
+/**
+ * /rooms 쿼리스트링 스키마.
+ * - view: 카드/칸반/테이블 뷰 모드
+ * - floor: 층 필터 (ex. ?floor=7)
+ * - status: 상태 필터 (ex. ?status=VACANT)
+ * - selected: 드로어로 열린 방 id — 딥링크 & 새로고침 복원
+ * 모든 필드 optional. `catch` 로 파싱 실패 시 undefined 로 fallback (깨진 URL 도 복구).
+ */
+export const roomsSearchSchema = z.object({
+  view: z.enum(['floor', 'kanban', 'table']).optional().catch(undefined),
+  floor: z.coerce.number().int().optional().catch(undefined),
+  status: z.enum(ROOM_STATUSES).optional().catch(undefined),
+  selected: z.string().optional().catch(undefined),
+})
+
+export type RoomsSearch = z.infer<typeof roomsSearchSchema>
+
+export const roomsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/rooms',
   beforeLoad: requireAuth,
   component: RoomListPage,
+  validateSearch: (search) => roomsSearchSchema.parse(search),
 })
 
 const routeTree = rootRoute.addChildren([

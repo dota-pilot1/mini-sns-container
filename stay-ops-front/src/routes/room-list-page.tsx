@@ -1,5 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useNavigate, useSearch } from '@tanstack/react-router'
+import { useCallback, useMemo, useState } from 'react'
 
+import type { RoomsSearch } from '@/app/router'
+import type { RoomStatus } from '@/features/room/model/room-types'
 import { useRoomsQuery } from '@/features/room/model/use-rooms'
 import { RoomCreateModal } from '@/features/room/ui/room-create-modal'
 import { RoomDetailDrawer } from '@/features/room/ui/room-detail-drawer'
@@ -20,10 +23,37 @@ const VIEW_TABS: { id: ViewMode; label: string }[] = [
 ]
 
 export function RoomListPage() {
-  const [view, setView] = useState<ViewMode>('floor')
-  const [filter, setFilter] = useState<RoomFilter>({ floor: null, status: null })
-  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
+  const search = useSearch({ from: '/rooms' }) as RoomsSearch
+  const navigate = useNavigate({ from: '/rooms' })
   const [createOpen, setCreateOpen] = useState(false)
+
+  const view: ViewMode = search.view ?? 'floor'
+  const filter: RoomFilter = {
+    floor: search.floor ?? null,
+    status: search.status ?? null,
+  }
+  const selectedRoomId = search.selected ?? null
+
+  /** prev 를 받아 partial patch — undefined 로 두면 URL 에서 제거. */
+  const patchSearch = useCallback(
+    (patch: Partial<RoomsSearch>) => {
+      navigate({
+        search: (prev) => ({ ...prev, ...patch }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  const setView = (next: ViewMode) =>
+    patchSearch({ view: next === 'floor' ? undefined : next })
+  const setFilter = (next: RoomFilter) =>
+    patchSearch({
+      floor: next.floor ?? undefined,
+      status: next.status ?? undefined,
+    })
+  const setSelected = (roomId: string | null) =>
+    patchSearch({ selected: roomId ?? undefined })
 
   const { data = [], isLoading, isError, error } = useRoomsQuery()
 
@@ -86,23 +116,23 @@ export function RoomListPage() {
             message={error instanceof Error ? error.message : '알 수 없는 오류'}
           />
         ) : view === 'floor' ? (
-          <RoomFloorView rooms={filtered} onSelect={setSelectedRoomId} />
+          <RoomFloorView rooms={filtered} onSelect={setSelected} />
         ) : view === 'table' ? (
-          <RoomTableView rooms={filtered} onSelect={setSelectedRoomId} />
+          <RoomTableView rooms={filtered} onSelect={setSelected} />
         ) : (
-          <RoomKanbanView rooms={filtered} onSelect={setSelectedRoomId} />
+          <RoomKanbanView rooms={filtered} onSelect={setSelected} />
         )}
       </section>
 
       <RoomDetailDrawer
         room={selectedRoom}
-        onClose={() => setSelectedRoomId(null)}
+        onClose={() => setSelected(null)}
       />
 
       <RoomCreateModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        onCreated={(roomId) => setSelectedRoomId(roomId)}
+        onCreated={(roomId) => setSelected(roomId)}
       />
     </div>
   )
@@ -128,3 +158,9 @@ function ErrorState({ message }: { message: string }) {
     </div>
   )
 }
+
+// Export for type narrowing elsewhere if needed
+export type { ViewMode }
+
+// RoomStatus 는 sidebar filter 내부에서도 쓰이지만 타입 참조가 필요해서 re-export
+export type { RoomStatus }
