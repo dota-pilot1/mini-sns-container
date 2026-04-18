@@ -6,6 +6,7 @@ import {
   RoomSidebar,
   type RoomFilter,
 } from '@/features/room/ui/room-sidebar'
+import { RoomTableView } from '@/features/room/ui/room-table-view'
 
 type ViewMode = 'floor' | 'kanban' | 'table'
 
@@ -71,6 +72,8 @@ export function RoomListPage() {
           />
         ) : view === 'floor' ? (
           <RoomFloorView rooms={filtered} />
+        ) : view === 'table' ? (
+          <RoomTableView rooms={filtered} />
         ) : (
           <PlaceholderView
             label={VIEW_TABS.find((t) => t.id === view)?.label ?? ''}
