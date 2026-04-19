@@ -419,7 +419,6 @@ function ContractsSection({
 }) {
   const hasActive = contracts.some((c) => c.status === 'ACTIVE')
   const latest = contracts[0] ?? null
-  const hasMore = contracts.length > 1
 
   return (
     <section className="flex flex-col gap-2 border-t border-[var(--border)] px-5 py-3">
@@ -428,7 +427,7 @@ function ContractsSection({
           계약 이력 ({contracts.length})
         </h3>
         <div className="flex items-center gap-1.5">
-          {hasMore ? (
+          {contracts.length > 0 ? (
             <button
               type="button"
               onClick={onShowHistory}
