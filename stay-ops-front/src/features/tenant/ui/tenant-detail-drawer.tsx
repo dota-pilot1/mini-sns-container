@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { ContractResponse } from '@/features/contract/api/contract-api'
 import { CONTRACT_STATUS_LABEL } from '@/features/contract/model/contract-types'
 import { useTerminateContract } from '@/features/contract/model/use-terminate-contract'
+import { RecentPaymentsSection } from '@/features/payment/ui/recent-payments-section'
 import type { TenantResponse } from '@/features/tenant/api/tenant-api'
 import { useDeleteTenant } from '@/features/tenant/model/use-delete-tenant'
 import { useUpdateTenant } from '@/features/tenant/model/use-update-tenant'
@@ -81,6 +82,11 @@ export function TenantDetailDrawer({
         {mode === 'view' ? (
           <>
             <InfoSection tenant={tenant} />
+            {activeContract ? (
+              <div className="px-5">
+                <RecentPaymentsSection contractId={activeContract.contractId} />
+              </div>
+            ) : null}
             <ContractsSection
               contracts={tenantContracts}
               roomNumberById={roomNumberById}

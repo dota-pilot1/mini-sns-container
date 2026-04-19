@@ -2,6 +2,7 @@ import { useNavigate, useParams } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 
 import { useContractsQuery } from '@/features/contract/model/use-contracts'
+import { RecentPaymentsSection } from '@/features/payment/ui/recent-payments-section'
 import type { RoomResponse } from '@/features/room/api/room-api'
 import {
   ROOM_OPTION_LABEL,
@@ -283,6 +284,13 @@ function TenantsSection({ roomId }: { roomId: string }) {
                   </dd>
                 </dl>
               </button>
+              <div
+                className="mt-2"
+                onClick={(e) => e.stopPropagation()}
+                role="presentation"
+              >
+                <RecentPaymentsSection contractId={contract.contractId} />
+              </div>
             </li>
           ))}
         </ul>
