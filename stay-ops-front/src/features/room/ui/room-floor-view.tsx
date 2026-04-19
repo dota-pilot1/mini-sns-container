@@ -1,12 +1,20 @@
+import type { RoomPaymentStatusMap } from '@/features/payment/model/use-room-payment-status'
 import type { RoomResponse } from '@/features/room/api/room-api'
 import { RoomCard } from '@/features/room/ui/room-card'
 
 type Props = {
   rooms: RoomResponse[]
+  paymentStatusByRoomId?: RoomPaymentStatusMap
+  paymentPeriod?: string
   onSelect?: (roomId: string) => void
 }
 
-export function RoomFloorView({ rooms, onSelect }: Props) {
+export function RoomFloorView({
+  rooms,
+  paymentStatusByRoomId,
+  paymentPeriod,
+  onSelect,
+}: Props) {
   const byFloor = groupByFloor(rooms)
   const floors = Object.keys(byFloor)
     .map(Number)
@@ -33,9 +41,22 @@ export function RoomFloorView({ rooms, onSelect }: Props) {
             </span>
           </h2>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
-            {byFloor[floor].map((room) => (
-              <RoomCard key={room.roomId} room={room} onClick={onSelect} />
-            ))}
+            {byFloor[floor].map((room) => {
+              const ps = paymentStatusByRoomId?.[room.roomId]
+              return (
+                <RoomCard
+                  key={room.roomId}
+                  room={room}
+                  paymentStatus={ps}
+                  paymentTitle={
+                    ps && paymentPeriod
+                      ? `${paymentPeriod} ${ps === 'PAID' ? '완납' : ps === 'OVERDUE' ? '미납' : '환불됨'}`
+                      : undefined
+                  }
+                  onClick={onSelect}
+                />
+              )
+            })}
           </div>
         </section>
       ))}

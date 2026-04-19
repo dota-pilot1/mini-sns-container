@@ -2,6 +2,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useCallback, useMemo, useState } from 'react'
 
 import type { RoomsSearch } from '@/app/router'
+import { useRoomPaymentStatusMap } from '@/features/payment/model/use-room-payment-status'
 import type { RoomStatus } from '@/features/room/model/room-types'
 import { useRoomsQuery } from '@/features/room/model/use-rooms'
 import { RoomCreateModal } from '@/features/room/ui/room-create-modal'
@@ -56,6 +57,7 @@ export function RoomListPage() {
     patchSearch({ selected: roomId ?? undefined })
 
   const { data = [], isLoading, isError, error } = useRoomsQuery()
+  const { data: paymentStatusByRoomId, period: paymentPeriod } = useRoomPaymentStatusMap()
 
   const filtered = useMemo(() => {
     return data.filter((r) => {
@@ -116,11 +118,26 @@ export function RoomListPage() {
             message={error instanceof Error ? error.message : '알 수 없는 오류'}
           />
         ) : view === 'floor' ? (
-          <RoomFloorView rooms={filtered} onSelect={setSelected} />
+          <RoomFloorView
+            rooms={filtered}
+            paymentStatusByRoomId={paymentStatusByRoomId}
+            paymentPeriod={paymentPeriod}
+            onSelect={setSelected}
+          />
         ) : view === 'table' ? (
-          <RoomTableView rooms={filtered} onSelect={setSelected} />
+          <RoomTableView
+            rooms={filtered}
+            paymentStatusByRoomId={paymentStatusByRoomId}
+            paymentPeriod={paymentPeriod}
+            onSelect={setSelected}
+          />
         ) : (
-          <RoomKanbanView rooms={filtered} onSelect={setSelected} />
+          <RoomKanbanView
+            rooms={filtered}
+            paymentStatusByRoomId={paymentStatusByRoomId}
+            paymentPeriod={paymentPeriod}
+            onSelect={setSelected}
+          />
         )}
       </section>
 

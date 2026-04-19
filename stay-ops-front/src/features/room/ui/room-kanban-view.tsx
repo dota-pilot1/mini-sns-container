@@ -11,6 +11,7 @@ import {
 } from '@dnd-kit/core'
 import { useMemo, useState } from 'react'
 
+import type { RoomPaymentStatusMap } from '@/features/payment/model/use-room-payment-status'
 import type { RoomResponse } from '@/features/room/api/room-api'
 import { useChangeRoomStatus } from '@/features/room/model/use-change-room-status'
 import {
@@ -23,10 +24,17 @@ import { RoomCard } from '@/features/room/ui/room-card'
 
 type Props = {
   rooms: RoomResponse[]
+  paymentStatusByRoomId?: RoomPaymentStatusMap
+  paymentPeriod?: string
   onSelect?: (roomId: string) => void
 }
 
-export function RoomKanbanView({ rooms, onSelect }: Props) {
+export function RoomKanbanView({
+  rooms,
+  paymentStatusByRoomId,
+  paymentPeriod,
+  onSelect,
+}: Props) {
   const [activeRoom, setActiveRoom] = useState<RoomResponse | null>(null)
   const changeStatus = useChangeRoomStatus()
 
@@ -79,6 +87,8 @@ export function RoomKanbanView({ rooms, onSelect }: Props) {
             key={status}
             status={status}
             rooms={grouped[status]}
+            paymentStatusByRoomId={paymentStatusByRoomId}
+            paymentPeriod={paymentPeriod}
             onSelect={onSelect}
           />
         ))}
@@ -98,10 +108,14 @@ export function RoomKanbanView({ rooms, onSelect }: Props) {
 function KanbanColumn({
   status,
   rooms,
+  paymentStatusByRoomId,
+  paymentPeriod,
   onSelect,
 }: {
   status: RoomStatus
   rooms: RoomResponse[]
+  paymentStatusByRoomId?: RoomPaymentStatusMap
+  paymentPeriod?: string
   onSelect?: (roomId: string) => void
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status })
@@ -141,6 +155,8 @@ function KanbanColumn({
             <DraggableRoomCard
               key={room.roomId}
               room={room}
+              paymentStatus={paymentStatusByRoomId?.[room.roomId]}
+              paymentPeriod={paymentPeriod}
               onSelect={onSelect}
             />
           ))
@@ -152,9 +168,13 @@ function KanbanColumn({
 
 function DraggableRoomCard({
   room,
+  paymentStatus,
+  paymentPeriod,
   onSelect,
 }: {
   room: RoomResponse
+  paymentStatus?: import('@/features/payment/model/use-room-payment-status').RoomPaymentStatus
+  paymentPeriod?: string
   onSelect?: (roomId: string) => void
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -171,7 +191,16 @@ function DraggableRoomCard({
         isDragging ? 'opacity-30' : 'opacity-100',
       ].join(' ')}
     >
-      <RoomCard room={room} onClick={onSelect} />
+      <RoomCard
+        room={room}
+        paymentStatus={paymentStatus}
+        paymentTitle={
+          paymentStatus && paymentPeriod
+            ? `${paymentPeriod} ${paymentStatus === 'PAID' ? '완납' : paymentStatus === 'OVERDUE' ? '미납' : '환불됨'}`
+            : undefined
+        }
+        onClick={onSelect}
+      />
     </div>
   )
 }

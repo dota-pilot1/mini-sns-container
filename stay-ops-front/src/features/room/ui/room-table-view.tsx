@@ -10,6 +10,8 @@ import {
 } from '@tanstack/react-table'
 import { useMemo, useState } from 'react'
 
+import type { RoomPaymentStatusMap } from '@/features/payment/model/use-room-payment-status'
+import { PaymentStatusPill } from '@/features/payment/ui/payment-status-pill'
 import type { RoomResponse } from '@/features/room/api/room-api'
 import {
   ROOM_OPTION_LABEL,
@@ -37,10 +39,17 @@ function relative(iso: string): string {
 
 type Props = {
   rooms: RoomResponse[]
+  paymentStatusByRoomId?: RoomPaymentStatusMap
+  paymentPeriod?: string
   onSelect?: (roomId: string) => void
 }
 
-export function RoomTableView({ rooms, onSelect }: Props) {
+export function RoomTableView({
+  rooms,
+  paymentStatusByRoomId,
+  paymentPeriod,
+  onSelect,
+}: Props) {
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'roomNumber', desc: false },
   ])
@@ -140,6 +149,26 @@ export function RoomTableView({ rooms, onSelect }: Props) {
           ROOM_STATUS_ORDER.indexOf(b.original.status),
         size: 80,
       }),
+      {
+        id: 'paymentStatus',
+        header: '결제',
+        cell: ({ row }) => {
+          const ps = paymentStatusByRoomId?.[row.original.roomId]
+          if (!ps) return <span className="text-[var(--muted)]">—</span>
+          return (
+            <PaymentStatusPill
+              status={ps}
+              title={
+                paymentPeriod
+                  ? `${paymentPeriod} ${ps === 'PAID' ? '완납' : ps === 'OVERDUE' ? '미납' : '환불됨'}`
+                  : undefined
+              }
+            />
+          )
+        },
+        enableSorting: false,
+        size: 80,
+      },
       ch.accessor('options', {
         header: '옵션',
         cell: (info) => {
@@ -173,7 +202,7 @@ export function RoomTableView({ rooms, onSelect }: Props) {
         size: 100,
       }),
     ],
-    [],
+    [paymentStatusByRoomId, paymentPeriod],
   )
 
   const table = useReactTable({

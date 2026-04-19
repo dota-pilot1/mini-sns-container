@@ -1,3 +1,5 @@
+import { PaymentStatusPill } from '@/features/payment/ui/payment-status-pill'
+import type { RoomPaymentStatus } from '@/features/payment/model/use-room-payment-status'
 import type { RoomResponse } from '@/features/room/api/room-api'
 import { RoomStatusBadge } from '@/features/room/ui/room-status-badge'
 
@@ -5,10 +7,12 @@ const krw = new Intl.NumberFormat('ko-KR')
 
 type Props = {
   room: RoomResponse
+  paymentStatus?: RoomPaymentStatus
+  paymentTitle?: string
   onClick?: (roomId: string) => void
 }
 
-export function RoomCard({ room, onClick }: Props) {
+export function RoomCard({ room, paymentStatus, paymentTitle, onClick }: Props) {
   return (
     <button
       type="button"
@@ -33,7 +37,12 @@ export function RoomCard({ room, onClick }: Props) {
         <span className="text-base font-bold tracking-[-0.02em] text-[var(--foreground)]">
           {room.roomNumber}
         </span>
-        <RoomStatusBadge status={room.status} />
+        <span className="flex items-center gap-1">
+          <RoomStatusBadge status={room.status} />
+          {paymentStatus ? (
+            <PaymentStatusPill status={paymentStatus} title={paymentTitle} />
+          ) : null}
+        </span>
       </div>
       <div className="flex items-center justify-between text-[11px] text-[var(--muted)]">
         <span>{room.floor}F</span>
