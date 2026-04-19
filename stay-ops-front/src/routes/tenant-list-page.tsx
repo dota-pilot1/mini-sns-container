@@ -249,7 +249,14 @@ export function TenantListPage() {
       />
 
       <CancelOccupancyDialog
-        contract={terminateTarget?.contract ?? null}
+        chain={
+          terminateTarget
+            ? (contractsByTenant.get(terminateTarget.tenant.tenantId) ?? []).filter(
+                (c) => c.roomId === terminateTarget.contract.roomId,
+              )
+            : null
+        }
+        initialContractId={terminateTarget?.contract.contractId}
         tenantName={terminateTarget?.tenant.name ?? ''}
         roomNumber={terminateTarget?.roomNumber ?? undefined}
         onClose={() => setTerminateTarget(null)}

@@ -195,7 +195,12 @@ export function TenantDetailDrawer({
       </aside>
 
       <CancelOccupancyDialog
-        contract={terminateTarget}
+        chain={
+          terminateTarget
+            ? tenantContracts.filter((c) => c.roomId === terminateTarget.roomId)
+            : null
+        }
+        initialContractId={terminateTarget?.contractId}
         tenantName={tenant.name}
         roomNumber={
           terminateTarget ? roomNumberById[terminateTarget.roomId] : undefined

@@ -229,14 +229,29 @@ function TenantsSection({ roomId }: { roomId: string }) {
   const { data: tenants = [], isLoading: tenantsLoading } = useTenantsQuery()
   const { data: contracts = [], isLoading: contractsLoading } = useContractsQuery({
     roomId,
-    effectiveOn: roomDetailTodayISO(),
   })
 
   const linked = useMemo(() => {
     const byId = new Map(tenants.map((t) => [t.tenantId, t]))
-    return contracts
-      .map((c) => ({ contract: c, tenant: byId.get(c.tenantId) }))
-      .filter((x): x is { contract: typeof x.contract; tenant: TenantResponse } => !!x.tenant)
+    const today = roomDetailTodayISO()
+    const byTenant = new Map<string, typeof contracts>()
+    for (const c of contracts) {
+      const arr = byTenant.get(c.tenantId) ?? []
+      arr.push(c)
+      byTenant.set(c.tenantId, arr)
+    }
+    const items: {
+      tenant: TenantResponse
+      contract: (typeof contracts)[number]
+    }[] = []
+    for (const [tenantId, arr] of byTenant) {
+      const current = arr.find((c) => today >= c.startDate && today <= c.endDate)
+      if (!current) continue
+      const tenant = byId.get(tenantId)
+      if (!tenant) continue
+      items.push({ tenant, contract: current })
+    }
+    return items
   }, [tenants, contracts])
 
   return (

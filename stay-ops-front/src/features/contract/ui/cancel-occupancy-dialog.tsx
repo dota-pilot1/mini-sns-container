@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import type { ContractResponse } from '@/features/contract/api/contract-api'
+import { deriveContractState } from '@/features/contract/model/contract-types'
 import { useCancelOccupancy } from '@/features/contract/model/use-cancel-occupancy'
 import { usePaymentsQuery } from '@/features/payment/model/use-payments'
 import { ApiError } from '@/shared/api/types'
@@ -31,8 +32,10 @@ function addDays(iso: string, days: number): string {
 }
 
 type Props = {
-  /** null 이면 닫힘. 계약 취소할 계약이 들어오면 열림. */
-  contract: ContractResponse | null
+  /** null 이면 닫힘. 취소 가능한 계약 체인(PAST 포함 가능). */
+  chain: ContractResponse[] | null
+  /** 열릴 때 사전 선택할 계약. 없으면 EFFECTIVE → 첫 번째 순으로 자동 선택. */
+  initialContractId?: string
   tenantName: string
   roomNumber?: string
   onClose: () => void
@@ -42,25 +45,54 @@ type Props = {
 /**
  * 계약 취소 다이얼로그 — 계약 종료 + 관련 PAID 결제 일괄 환불을 한 번에.
  *
- * 백엔드 `POST /contracts/{id}/cancel-occupancy` 를 호출한다. 트랜잭션이 합쳐져 있어
- * 환불 일부만 실패해 계약만 종료되는 유령 상태가 발생하지 않는다.
+ * 좌측에 해당 입주자의 계약 목록(지난 계약은 선택 불가), 우측에 종료일/환불 정보.
+ * 백엔드 `POST /contracts/{id}/cancel-occupancy` 를 호출한다.
  */
 export function CancelOccupancyDialog({
-  contract,
+  chain,
+  initialContractId,
   tenantName,
   roomNumber,
   onClose,
   onDone,
 }: Props) {
-  const open = contract !== null
+  const open = chain !== null
   const cancelMutation = useCancelOccupancy()
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [moveOutDate, setMoveOutDate] = useState<string>(todayLocalISO())
   const [refundDeposit, setRefundDeposit] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const sortedChain = useMemo(
+    () =>
+      (chain ?? [])
+        .slice()
+        .sort((a, b) => b.startDate.localeCompare(a.startDate)),
+    [chain],
+  )
+
+  const cancelable = useMemo(
+    () => sortedChain.filter((c) => deriveContractState(c) !== 'PAST'),
+    [sortedChain],
+  )
+
+  const contract = useMemo(
+    () => sortedChain.find((c) => c.contractId === selectedId) ?? null,
+    [sortedChain, selectedId],
+  )
+
+  // open 되면 initialContractId(취소 가능한 경우) → EFFECTIVE → 첫 번째 취소 가능 순으로 자동 선택
+  useEffect(() => {
+    if (!open) return
+    const initial =
+      initialContractId && cancelable.find((c) => c.contractId === initialContractId)
+    const effective = cancelable.find((c) => deriveContractState(c) === 'EFFECTIVE')
+    setSelectedId((initial ?? effective ?? cancelable[0])?.contractId ?? null)
+  }, [open, cancelable, initialContractId])
+
   const { data: payments = [] } = usePaymentsQuery(
     { contractId: contract?.contractId },
-    { enabled: open },
+    { enabled: open && !!contract },
   )
 
   useEffect(() => {
@@ -149,11 +181,81 @@ export function CancelOccupancyDialog({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-0 md:grid-cols-2">
-        {/* Left: 종료일 + 옵션 */}
-        <section className="flex flex-col gap-3 border-b border-[var(--border)] p-5 md:border-b-0 md:border-r">
-          <h3 className="text-sm font-semibold">종료일</h3>
+      <div className="grid grid-cols-1 gap-0 md:grid-cols-[1fr_1.2fr]">
+        {/* Left: 계약 목록 (PAST 는 비활성) */}
+        <section className="flex flex-col gap-2 border-b border-[var(--border)] p-5 md:border-b-0 md:border-r">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+            계약 목록 · 총 {sortedChain.length}건
+          </h3>
+          {sortedChain.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--control)] px-3 py-6 text-center text-xs text-[var(--muted)]">
+              계약 없음
+            </p>
+          ) : (
+            <ul className="flex max-h-[340px] flex-col gap-1.5 overflow-y-auto pr-1">
+              {sortedChain.map((c) => {
+                const state = deriveContractState(c)
+                const disabled = state === 'PAST'
+                const isSelected = contract?.contractId === c.contractId
+                return (
+                  <li key={c.contractId}>
+                    <button
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => setSelectedId(c.contractId)}
+                      className={[
+                        'flex w-full flex-col gap-0.5 rounded-lg border px-3 py-2 text-left text-xs transition',
+                        disabled
+                          ? 'cursor-not-allowed border-[var(--border)] bg-[var(--control)] opacity-50'
+                          : isSelected
+                            ? 'border-rose-500 bg-rose-500/5'
+                            : 'border-[var(--border)] bg-[var(--surface-strong)] hover:border-rose-500/60',
+                      ].join(' ')}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-[var(--foreground)]">
+                          {c.startDate} ~ {c.endDate}
+                        </span>
+                        <span
+                          className={[
+                            'rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
+                            state === 'EFFECTIVE'
+                              ? 'bg-emerald-500/15 text-emerald-600'
+                              : state === 'UPCOMING'
+                                ? 'bg-amber-500/15 text-amber-600'
+                                : 'bg-slate-500/15 text-slate-500',
+                          ].join(' ')}
+                        >
+                          {state === 'EFFECTIVE'
+                            ? '거주중'
+                            : state === 'UPCOMING'
+                              ? '예정'
+                              : '지남'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between tabular-nums text-[var(--muted)]">
+                        <span>월 {numberFmt.format(c.monthlyRent)}원</span>
+                        {isSelected ? (
+                          <span className="text-[10px] font-medium text-rose-500">
+                            취소 대상
+                          </span>
+                        ) : null}
+                      </div>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+          {cancelable.length === 0 ? (
+            <p className="rounded-md bg-amber-500/10 px-3 py-2 text-[11px] text-amber-700 dark:text-amber-300">
+              취소 가능한 계약이 없습니다. 지난 계약은 취소 대상이 아닙니다.
+            </p>
+          ) : null}
+        </section>
 
+        {/* Right: 종료일 + 환불 */}
+        <section className="flex flex-col gap-3 p-5">
           {contract ? (
             <div className="flex flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--control)] p-3">
               <div className="flex items-center justify-between text-xs text-[var(--muted)]">
@@ -222,11 +324,10 @@ export function CancelOccupancyDialog({
               </span>
             </span>
           </label>
-        </section>
 
-        {/* Right: 환불 금액 */}
-        <section className="flex flex-col gap-3 p-5">
-          <h3 className="text-sm font-semibold">환불 대상 결제</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+            환불 대상 결제
+          </h3>
 
           {paidOnly.length === 0 ? (
             <p className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-strong)] px-3 py-4 text-center text-xs text-[var(--muted)]">

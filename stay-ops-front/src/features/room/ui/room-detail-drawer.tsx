@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ContractResponse } from '@/features/contract/api/contract-api'
 import { useContractsQuery } from '@/features/contract/model/use-contracts'
 import { CancelOccupancyDialog } from '@/features/contract/ui/cancel-occupancy-dialog'
+import { ContractHistoryDialog } from '@/features/contract/ui/contract-history-dialog'
 import { ExtendAndPayDialog } from '@/features/contract/ui/extend-and-pay-dialog'
 import { usePaymentsQuery } from '@/features/payment/model/use-payments'
 import { PaymentStatusPill } from '@/features/payment/ui/payment-status-pill'
@@ -241,20 +242,43 @@ function TenantsSection({ roomId, roomNumber }: { roomId: string; roomNumber: st
     tenant: TenantResponse
   } | null>(null)
   const [cancelTarget, setCancelTarget] = useState<{
-    contract: ContractResponse
+    chain: ContractResponse[]
     tenant: TenantResponse
+  } | null>(null)
+  const [historyTarget, setHistoryTarget] = useState<{
+    tenant: TenantResponse
+    chain: ContractResponse[]
   } | null>(null)
   const { data: tenants = [], isLoading: tenantsLoading } = useTenantsQuery()
   const { data: contracts = [], isLoading: contractsLoading } = useContractsQuery({
     roomId,
-    effectiveOn: todayLocalISO(),
   })
 
   const linked = useMemo(() => {
     const byId = new Map(tenants.map((t) => [t.tenantId, t]))
-    return contracts
-      .map((c) => ({ contract: c, tenant: byId.get(c.tenantId) }))
-      .filter((x): x is { contract: typeof x.contract; tenant: TenantResponse } => !!x.tenant)
+    const today = todayLocalISO()
+    const byTenant = new Map<string, ContractResponse[]>()
+    for (const c of contracts) {
+      const arr = byTenant.get(c.tenantId) ?? []
+      arr.push(c)
+      byTenant.set(c.tenantId, arr)
+    }
+    const items: {
+      tenant: TenantResponse
+      contract: ContractResponse
+      chain: ContractResponse[]
+    }[] = []
+    for (const [tenantId, arr] of byTenant) {
+      const current = arr.find((c) => today >= c.startDate && today <= c.endDate)
+      if (!current) continue
+      const tenant = byId.get(tenantId)
+      if (!tenant) continue
+      const chain = arr
+        .slice()
+        .sort((a, b) => b.startDate.localeCompare(a.startDate))
+      items.push({ tenant, contract: current, chain })
+    }
+    return items
   }, [tenants, contracts])
 
   const sole = linked.length === 1 ? linked[0] : null
@@ -276,6 +300,19 @@ function TenantsSection({ roomId, roomNumber }: { roomId: string; roomNumber: st
           <div className="flex items-center gap-1.5">
             <button
               type="button"
+              onClick={() =>
+                setHistoryTarget({ tenant: sole.tenant, chain: sole.chain })
+              }
+              title={`계약 목록 (${sole.chain.length}건)`}
+              className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--control)] px-2 py-1 text-[11px] font-medium text-[var(--foreground)] transition hover:border-[var(--accent)] hover:bg-[var(--control-hover)]"
+            >
+              계약 목록
+              <span className="tabular-nums text-[var(--muted)]">
+                {sole.chain.length}
+              </span>
+            </button>
+            <button
+              type="button"
               onClick={() => setExtendTarget(sole)}
               className="rounded-md border border-[var(--border)] bg-[var(--control)] px-2 py-1 text-[11px] font-medium text-[var(--foreground)] transition hover:border-[var(--accent)] hover:bg-[var(--control-hover)]"
             >
@@ -283,7 +320,9 @@ function TenantsSection({ roomId, roomNumber }: { roomId: string; roomNumber: st
             </button>
             <button
               type="button"
-              onClick={() => setCancelTarget(sole)}
+              onClick={() =>
+                setCancelTarget({ tenant: sole.tenant, chain: sole.chain })
+              }
               className="rounded-md border border-rose-500/40 bg-rose-500/5 px-2 py-1 text-[11px] font-medium text-rose-600 transition hover:bg-rose-500/10"
             >
               계약 취소
@@ -315,10 +354,17 @@ function TenantsSection({ roomId, roomNumber }: { roomId: string; roomNumber: st
         onClose={() => setExtendTarget(null)}
       />
       <CancelOccupancyDialog
-        contract={cancelTarget?.contract ?? null}
+        chain={cancelTarget?.chain ?? null}
         tenantName={cancelTarget?.tenant.name ?? ''}
         roomNumber={roomNumber}
         onClose={() => setCancelTarget(null)}
+      />
+      <ContractHistoryDialog
+        open={historyTarget !== null}
+        tenantName={historyTarget?.tenant.name ?? ''}
+        contracts={historyTarget?.chain ?? []}
+        roomNumberById={{ [roomId]: roomNumber }}
+        onClose={() => setHistoryTarget(null)}
       />
     </section>
   )
