@@ -13,6 +13,9 @@ import com.cj.stayops.backend.auth.domain.exception.WeakPasswordException;
 import com.cj.stayops.backend.auth.presentation.dto.ErrorResponse;
 import com.cj.stayops.backend.contract.domain.exception.ContractNotFoundException;
 import com.cj.stayops.backend.contract.domain.exception.InvalidContractFieldException;
+import com.cj.stayops.backend.payment.domain.exception.DuplicatePaidPaymentException;
+import com.cj.stayops.backend.payment.domain.exception.InvalidPaymentFieldException;
+import com.cj.stayops.backend.payment.domain.exception.PaymentNotFoundException;
 import com.cj.stayops.backend.room.domain.exception.DuplicateRoomNumberException;
 import com.cj.stayops.backend.room.domain.exception.ImageNotUploadedException;
 import com.cj.stayops.backend.room.domain.exception.InvalidRoomFieldException;
@@ -144,6 +147,30 @@ public class AuthExceptionHandler {
 	public ResponseEntity<ErrorResponse> handleContractNotFound(ContractNotFoundException e) {
 		return ResponseEntity.status(HttpStatus.NOT_FOUND)
 			.body(ErrorResponse.of("CONTRACT_NOT_FOUND", e.getMessage()));
+	}
+
+	/** 결제 필드 도메인 검증 실패 → 400 Bad Request. */
+	@ExceptionHandler(InvalidPaymentFieldException.class)
+	public ResponseEntity<ErrorResponse> handleInvalidPaymentField(InvalidPaymentFieldException e) {
+		List<ErrorResponse.FieldError> errors = List.of(
+			new ErrorResponse.FieldError(e.field(), e.getMessage())
+		);
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+			.body(ErrorResponse.of("INVALID_PAYMENT_FIELD", e.getMessage(), errors));
+	}
+
+	/** 존재하지 않는 결제 → 404 Not Found. */
+	@ExceptionHandler(PaymentNotFoundException.class)
+	public ResponseEntity<ErrorResponse> handlePaymentNotFound(PaymentNotFoundException e) {
+		return ResponseEntity.status(HttpStatus.NOT_FOUND)
+			.body(ErrorResponse.of("PAYMENT_NOT_FOUND", e.getMessage()));
+	}
+
+	/** 한 계약의 한 달에 PAID 중복 → 409 Conflict. */
+	@ExceptionHandler(DuplicatePaidPaymentException.class)
+	public ResponseEntity<ErrorResponse> handleDuplicatePaidPayment(DuplicatePaidPaymentException e) {
+		return ResponseEntity.status(HttpStatus.CONFLICT)
+			.body(ErrorResponse.of("DUPLICATE_PAID_PAYMENT", e.getMessage()));
 	}
 
 	/** 업로드 요청 파라미터 오류 → 400 Bad Request. */
