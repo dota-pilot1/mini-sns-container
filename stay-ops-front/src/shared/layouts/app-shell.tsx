@@ -56,6 +56,12 @@ export function AppShell({ children }: PropsWithChildren) {
                 입주자
               </NavLink>
               <NavLink
+                active={pathname.startsWith('/payments')}
+                to="/payments"
+              >
+                결제
+              </NavLink>
+              <NavLink
                 active={pathname.startsWith('/users')}
                 to="/users"
               >
@@ -175,7 +181,7 @@ function LogoutIcon() {
 
 type NavLinkProps = PropsWithChildren<{
   active: boolean
-  to: '/' | '/rooms' | '/tenants' | '/users' | '/login' | '/signup'
+  to: '/' | '/rooms' | '/tenants' | '/payments' | '/users' | '/login' | '/signup'
 }>
 
 function NavLink({ active, children, to }: NavLinkProps) {

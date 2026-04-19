@@ -10,6 +10,7 @@ import { z } from 'zod'
 import { ROOM_STATUSES } from '@/features/room/model/room-types'
 import { HomePage } from '@/routes/home-page'
 import { LoginPage } from '@/routes/login-page'
+import { PaymentListPage } from '@/routes/payment-list-page'
 import { RoomDetailPage } from '@/routes/room-detail-page'
 import { RoomListPage } from '@/routes/room-list-page'
 import { SignupPage } from '@/routes/signup-page'
@@ -116,6 +117,13 @@ const tenantsRoute = createRoute({
   validateSearch: (search) => tenantsSearchSchema.parse(search),
 })
 
+const paymentsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/payments',
+  beforeLoad: requireAuth,
+  component: PaymentListPage,
+})
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
@@ -124,6 +132,7 @@ const routeTree = rootRoute.addChildren([
   roomDetailRoute,
   usersRoute,
   tenantsRoute,
+  paymentsRoute,
 ])
 
 export const router = createRouter({
