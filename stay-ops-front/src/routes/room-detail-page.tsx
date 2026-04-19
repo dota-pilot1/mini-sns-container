@@ -25,6 +25,11 @@ const dateFmt = new Intl.DateTimeFormat('ko-KR', {
   dateStyle: 'medium',
   timeStyle: 'short',
 })
+const dateOnlyFmt = new Intl.DateTimeFormat('ko-KR', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
 
 type Mode = 'view' | 'edit'
 
@@ -238,26 +243,45 @@ function TenantsSection({ roomId }: { roomId: string }) {
         <p className="text-xs text-[var(--muted)]">— 배정된 입주자 없음 —</p>
       ) : (
         <ul className="flex flex-col gap-1.5">
-          {linked.map(({ tenant }) => (
+          {linked.map(({ contract, tenant }) => (
             <li key={tenant.tenantId}>
               <button
                 type="button"
                 onClick={() =>
                   navigate({ to: '/tenants', search: { selected: tenant.tenantId } })
                 }
-                className="flex w-full items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-2 text-left transition hover:border-[var(--accent)]"
+                className="flex w-full flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-2 text-left transition hover:border-[var(--accent)]"
               >
-                <div className="flex flex-col">
-                  <span className="text-sm font-semibold tracking-[-0.01em]">
-                    {tenant.name}
-                  </span>
-                  <span className="tabular-nums text-xs text-[var(--muted)]">
-                    {tenant.phoneNumber}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold tracking-[-0.01em]">
+                      {tenant.name}
+                    </span>
+                    <span className="tabular-nums text-xs text-[var(--muted)]">
+                      {tenant.phoneNumber}
+                    </span>
+                  </div>
+                  <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+                    거주중
                   </span>
                 </div>
-                <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
-                  거주중
-                </span>
+
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 border-t border-[var(--border)] pt-2 text-xs">
+                  <dt className="text-[var(--muted)]">계약 기간</dt>
+                  <dd className="text-right tabular-nums text-[var(--foreground)]">
+                    {dateOnlyFmt.format(new Date(contract.startDate))}
+                    {' ~ '}
+                    {dateOnlyFmt.format(new Date(contract.endDate))}
+                  </dd>
+                  <dt className="text-[var(--muted)]">월세</dt>
+                  <dd className="text-right tabular-nums text-[var(--foreground)]">
+                    {krw.format(contract.monthlyRent)}원
+                  </dd>
+                  <dt className="text-[var(--muted)]">보증금</dt>
+                  <dd className="text-right tabular-nums text-[var(--foreground)]">
+                    {krw.format(contract.deposit)}원
+                  </dd>
+                </dl>
               </button>
             </li>
           ))}
