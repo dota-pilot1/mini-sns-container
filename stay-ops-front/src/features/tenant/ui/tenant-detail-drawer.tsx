@@ -4,6 +4,7 @@ import type { ContractResponse } from '@/features/contract/api/contract-api'
 import { useDeleteContract } from '@/features/contract/model/use-delete-contract'
 import { useTerminateContract } from '@/features/contract/model/use-terminate-contract'
 import { AddContractDialog } from '@/features/contract/ui/add-contract-dialog'
+import { ContractHistoryDialog } from '@/features/contract/ui/contract-history-dialog'
 import type { PaymentResponse } from '@/features/payment/api/payment-api'
 import { usePaymentsQuery } from '@/features/payment/model/use-payments'
 import {
@@ -54,6 +55,7 @@ export function TenantDetailDrawer({
   const [refundTarget, setRefundTarget] = useState<RefundTarget | null>(null)
   const [deleteContractTarget, setDeleteContractTarget] = useState<ContractResponse | null>(null)
   const [addContractOpen, setAddContractOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   const terminateMutation = useTerminateContract()
   const deleteMutation = useDeleteTenant()
@@ -139,6 +141,7 @@ export function TenantDetailDrawer({
               roomNumberById={roomNumberById}
               monthPayments={monthPayments}
               period={period}
+              onShowHistory={() => setHistoryOpen(true)}
               onTerminate={setTerminateTarget}
               onDeleteContract={setDeleteContractTarget}
               onAdd={() => setAddContractOpen(true)}
@@ -261,6 +264,14 @@ export function TenantDetailDrawer({
         tenantName={tenant.name}
         occupiedRoomIds={occupiedRoomIds}
         onClose={() => setAddContractOpen(false)}
+      />
+
+      <ContractHistoryDialog
+        open={historyOpen}
+        tenantName={tenant.name}
+        contracts={tenantContracts}
+        roomNumberById={roomNumberById}
+        onClose={() => setHistoryOpen(false)}
       />
     </div>
   )
@@ -388,6 +399,7 @@ function ContractsSection({
   roomNumberById,
   monthPayments,
   period,
+  onShowHistory,
   onTerminate,
   onDeleteContract,
   onAdd,
@@ -398,6 +410,7 @@ function ContractsSection({
   roomNumberById: Record<string, string>
   monthPayments: PaymentResponse[]
   period: string
+  onShowHistory: () => void
   onTerminate: (c: ContractResponse) => void
   onDeleteContract: (c: ContractResponse) => void
   onAdd: () => void
@@ -405,6 +418,8 @@ function ContractsSection({
   onRefundPayment: (p: PaymentResponse) => void
 }) {
   const hasActive = contracts.some((c) => c.status === 'ACTIVE')
+  const latest = contracts[0] ?? null
+  const hasMore = contracts.length > 1
 
   return (
     <section className="flex flex-col gap-2 border-t border-[var(--border)] px-5 py-3">
@@ -412,21 +427,34 @@ function ContractsSection({
         <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
           계약 이력 ({contracts.length})
         </h3>
-        {!hasActive ? (
-          <button
-            type="button"
-            onClick={onAdd}
-            className="rounded-md border border-[var(--border)] bg-[var(--control)] px-2 py-1 text-[11px] font-medium text-[var(--foreground)] transition hover:border-[var(--accent)] hover:bg-[var(--control-hover)]"
-          >
-            + 새 계약
-          </button>
-        ) : null}
+        <div className="flex items-center gap-1.5">
+          {hasMore ? (
+            <button
+              type="button"
+              onClick={onShowHistory}
+              aria-label="전체 계약 이력 보기"
+              title={`전체 ${contracts.length}건 보기`}
+              className="flex h-6 w-6 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--control)] text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--foreground)]"
+            >
+              <ListIcon />
+            </button>
+          ) : null}
+          {!hasActive ? (
+            <button
+              type="button"
+              onClick={onAdd}
+              className="rounded-md border border-[var(--border)] bg-[var(--control)] px-2 py-1 text-[11px] font-medium text-[var(--foreground)] transition hover:border-[var(--accent)] hover:bg-[var(--control-hover)]"
+            >
+              + 새 계약
+            </button>
+          ) : null}
+        </div>
       </div>
-      {contracts.length === 0 ? (
+      {!latest ? (
         <p className="text-xs text-[var(--muted)]">계약 없음</p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {contracts.map((c) => {
+          {[latest].map((c) => {
             const isActive = c.status === 'ACTIVE'
             const monthPaid = isActive
               ? monthPayments.find(
@@ -515,6 +543,30 @@ function ContractsSection({
         </ul>
       )}
     </section>
+  )
+}
+
+function ListIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <line x1="8" y1="6" x2="21" y2="6" />
+      <line x1="8" y1="12" x2="21" y2="12" />
+      <line x1="8" y1="18" x2="21" y2="18" />
+      <line x1="3" y1="6" x2="3.01" y2="6" />
+      <line x1="3" y1="12" x2="3.01" y2="12" />
+      <line x1="3" y1="18" x2="3.01" y2="18" />
+    </svg>
   )
 }
 
