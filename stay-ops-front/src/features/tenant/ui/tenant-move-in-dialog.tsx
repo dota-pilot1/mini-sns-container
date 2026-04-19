@@ -5,7 +5,10 @@ import { z } from 'zod'
 
 import { useCreateContract } from '@/features/contract/model/use-create-contract'
 import type { RoomResponse } from '@/features/room/api/room-api'
+import type { RoomImage } from '@/features/room/model/room-image-types'
 import { ROOM_OPTION_LABEL } from '@/features/room/model/room-types'
+import { useRoomImagesQuery } from '@/features/room/model/use-room-images'
+import { RoomImageLightbox } from '@/features/room/ui/room-image-lightbox'
 import { useCreateTenant } from '@/features/tenant/model/use-create-tenant'
 import { useTenantsQuery } from '@/features/tenant/model/use-tenants'
 import type { UserResponse } from '@/features/user/api/user-api'
@@ -399,6 +402,9 @@ export function TenantMoveInDialog({
 /* ───── selected room detail summary ───── */
 
 function SelectedRoomDetail({ room }: { room?: RoomResponse }) {
+  const { data: images = [] } = useRoomImagesQuery(room?.roomId)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+
   if (!room) {
     return (
       <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--control)] px-3 py-6 text-center text-xs text-[var(--muted)]">
@@ -406,6 +412,9 @@ function SelectedRoomDetail({ room }: { room?: RoomResponse }) {
       </div>
     )
   }
+
+  const orderedImages = sortImagesForPreview(images)
+  const previewImages = orderedImages.slice(0, 3)
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--control)] px-3 py-3 text-xs">
@@ -417,6 +426,41 @@ function SelectedRoomDetail({ room }: { room?: RoomResponse }) {
           {room.floor}F · {Number(room.sizePyeong)}평
         </span>
       </div>
+
+      {previewImages.length > 0 ? (
+        <div className="grid grid-cols-2 gap-1.5">
+          {previewImages.map((img, idx) => (
+            <button
+              key={img.id}
+              type="button"
+              onClick={() => setLightboxIndex(idx)}
+              className={[
+                'group relative overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-strong)]',
+                idx === 0 && previewImages.length > 1 ? 'col-span-2 aspect-[16/9]' : 'aspect-square',
+              ].join(' ')}
+              aria-label={`이미지 ${idx + 1} 크게 보기`}
+            >
+              <img
+                src={img.url}
+                alt={`${room.roomNumber}호 이미지 ${idx + 1}`}
+                loading="lazy"
+                className="h-full w-full object-cover transition group-hover:scale-[1.02]"
+              />
+              {img.primary ? (
+                <span className="absolute left-1 top-1 rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[9px] font-semibold text-white shadow">
+                  대표
+                </span>
+              ) : null}
+              {idx === previewImages.length - 1 && orderedImages.length > previewImages.length ? (
+                <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-[11px] font-medium text-white">
+                  +{orderedImages.length - previewImages.length}장 더보기
+                </span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[var(--muted)]">
         <span>월세</span>
         <span className="text-right tabular-nums text-[var(--foreground)]">
@@ -444,8 +488,24 @@ function SelectedRoomDetail({ room }: { room?: RoomResponse }) {
           {room.memo}
         </p>
       ) : null}
+
+      {lightboxIndex !== null ? (
+        <RoomImageLightbox
+          images={orderedImages}
+          startIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
+      ) : null}
     </div>
   )
+}
+
+function sortImagesForPreview(images: RoomImage[]): RoomImage[] {
+  return [...images].sort((a, b) => {
+    if (a.primary !== b.primary) return a.primary ? -1 : 1
+    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder
+    return a.createdAt.localeCompare(b.createdAt)
+  })
 }
 
 /* ───── room picker tile ───── */
