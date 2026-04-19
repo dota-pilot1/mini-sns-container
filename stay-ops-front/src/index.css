@@ -4,85 +4,87 @@
   --font-sans: "Pretendard Variable", "Pretendard", "Noto Sans KR", sans-serif;
 }
 
+/*
+ * 관리자 UI 디자인 토큰.
+ * 원칙:
+ *   1. 중성(neutral) 베이스 — 데이터가 주인공, 배경은 양보
+ *   2. 엘리베이션 3단계 — background → surface → surface-strong
+ *   3. WCAG AA 이상 대비 — 본문 4.5:1, muted 4.5:1
+ *   4. 시맨틱 색 분리 — success/warning/danger/info
+ *   5. 액센트는 절제 — primary action, selected 에만
+ */
+
 :root,
 :root[data-theme="light"] {
   color-scheme: light;
-  --background: #f3efe6;
-  --foreground: #171717;
-  --muted: #6f6a60;
-  --surface: rgba(255, 252, 246, 0.84);
-  --surface-strong: #fffaf0;
-  --border: rgba(84, 68, 44, 0.14);
-  --accent: #d26a2c;
-  --accent-strong: #9a3f12;
-  --ring: rgba(210, 106, 44, 0.28);
-  --control: rgba(255, 248, 238, 0.82);
-  --control-hover: rgba(255, 244, 230, 0.96);
-  --control-active: linear-gradient(135deg, #171717 0%, #3f3124 100%);
+
+  /* Neutrals (zinc) — shadcn 기본 */
+  --background: #fafafa;
+  --foreground: #09090b;
+  --muted: #71717a;
+  --surface: #ffffff;
+  --surface-strong: #f4f4f5;
+  --border: #d4d4d8;
+  --border-strong: #a1a1aa;
+
+  /* Accent (brand orange) */
+  --accent: #ea580c;
+  --accent-strong: #c2410c;
+  --accent-fg: #ffffff;
+  --ring: rgba(234, 88, 12, 0.32);
+
+  /* Controls */
+  --control: #f4f4f5;
+  --control-hover: #e4e4e7;
+
+  /* Semantic */
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --info: #2563eb;
+
+  /* Grid overlay — 거의 안 보일 정도 */
+  --grid-line: rgba(9, 9, 11, 0.035);
+
+  /* Dialog/모달 백드롭 — 라이트에서는 연한 회색 오버레이 */
+  --backdrop: rgba(15, 23, 42, 0.25);
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --background: #161311;
-  --foreground: #f7f1e8;
-  --muted: #b8ab9c;
-  --surface: rgba(31, 25, 22, 0.88);
-  --surface-strong: #241d19;
-  --border: rgba(240, 219, 194, 0.12);
-  --accent: #f29e61;
-  --accent-strong: #ffd2ae;
-  --ring: rgba(242, 158, 97, 0.34);
-  --control: rgba(41, 33, 29, 0.88);
-  --control-hover: rgba(54, 43, 38, 0.96);
-  --control-active: linear-gradient(135deg, #f29e61 0%, #c55f1f 100%);
-}
 
-:root[data-theme="sepia"] {
-  color-scheme: light;
-  --background: #f4ecd8;
-  --foreground: #3b2a1a;
-  --muted: #8b6f4e;
-  --surface: rgba(255, 248, 231, 0.9);
-  --surface-strong: #fff8e7;
-  --border: rgba(90, 60, 20, 0.18);
-  --accent: #a0522d;
-  --accent-strong: #6b2e0e;
-  --ring: rgba(160, 82, 45, 0.28);
-  --control: rgba(252, 244, 224, 0.85);
-  --control-hover: rgba(248, 236, 208, 0.96);
-  --control-active: linear-gradient(135deg, #6b2e0e 0%, #a0522d 100%);
-}
+  /*
+   * Neutrals — Linear/Notion/Arc 중간 톤.
+   * pitch-black (#09) 은 답답하고 흑백대비 너무 강함 → #1a 부터 시작해 계단형으로 올림.
+   */
+  --background: #1a1a1d;
+  --foreground: #fafafa;
+  --muted: #a1a1aa;
+  --surface: #242428;
+  --surface-strong: #2e2e33;
+  --border: #3f3f46;
+  --border-strong: #52525b;
 
-:root[data-theme="ocean"] {
-  color-scheme: dark;
-  --background: #0b1c2c;
-  --foreground: #e8f1f8;
-  --muted: #8ea8be;
-  --surface: rgba(18, 38, 58, 0.88);
-  --surface-strong: #14304a;
-  --border: rgba(180, 210, 235, 0.14);
-  --accent: #3fa7d6;
-  --accent-strong: #a5d8f0;
-  --ring: rgba(63, 167, 214, 0.34);
-  --control: rgba(22, 46, 70, 0.88);
-  --control-hover: rgba(30, 60, 90, 0.96);
-  --control-active: linear-gradient(135deg, #3fa7d6 0%, #1e5d88 100%);
-}
+  /* Accent (다크 배경용 밝은 오렌지) */
+  --accent: #fb923c;
+  --accent-strong: #fed7aa;
+  --accent-fg: #1a1a1d;
+  --ring: rgba(251, 146, 60, 0.38);
 
-:root[data-theme="forest"] {
-  color-scheme: dark;
-  --background: #12201a;
-  --foreground: #eaf3ea;
-  --muted: #9ab2a1;
-  --surface: rgba(22, 40, 32, 0.88);
-  --surface-strong: #1a2e24;
-  --border: rgba(200, 230, 210, 0.14);
-  --accent: #6abf7b;
-  --accent-strong: #b8e8c2;
-  --ring: rgba(106, 191, 123, 0.34);
-  --control: rgba(26, 46, 36, 0.88);
-  --control-hover: rgba(36, 60, 48, 0.96);
-  --control-active: linear-gradient(135deg, #6abf7b 0%, #2f6b3d 100%);
+  /* Controls */
+  --control: #2e2e33;
+  --control-hover: #3a3a40;
+
+  /* Semantic */
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
+
+  --grid-line: rgba(250, 250, 250, 0.04);
+
+  /* 다크에선 더 진하게 */
+  --backdrop: rgba(0, 0, 0, 0.55);
 }
 
 * {
@@ -90,10 +92,7 @@
 }
 
 html {
-  background:
-    radial-gradient(circle at top left, rgba(210, 106, 44, 0.18), transparent 28%),
-    radial-gradient(circle at top right, rgba(53, 106, 168, 0.16), transparent 26%),
-    var(--background);
+  background: var(--background);
 }
 
 body {
@@ -112,8 +111,8 @@ body::before {
   inset: 0;
   z-index: -1;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 24px 24px;
   content: "";
   pointer-events: none;

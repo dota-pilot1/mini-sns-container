@@ -49,6 +49,18 @@ export function AppShell({ children }: PropsWithChildren) {
               >
                 방관리
               </NavLink>
+              <NavLink
+                active={pathname.startsWith('/tenants')}
+                to="/tenants"
+              >
+                입주자
+              </NavLink>
+              <NavLink
+                active={pathname.startsWith('/users')}
+                to="/users"
+              >
+                관리자
+              </NavLink>
             </nav>
           ) : (
             <div className="ml-auto" />
@@ -163,7 +175,7 @@ function LogoutIcon() {
 
 type NavLinkProps = PropsWithChildren<{
   active: boolean
-  to: '/' | '/rooms' | '/login' | '/signup'
+  to: '/' | '/rooms' | '/tenants' | '/users' | '/login' | '/signup'
 }>
 
 function NavLink({ active, children, to }: NavLinkProps) {

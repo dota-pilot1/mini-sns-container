@@ -4,11 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { THEMES, type Theme, useThemeStore } from '@/shared/stores/theme-store'
 
 const THEME_SWATCHES: Record<Theme, string> = {
-  light: '#f3efe6',
-  dark: '#161311',
-  sepia: '#f4ecd8',
-  ocean: '#0b1c2c',
-  forest: '#12201a',
+  light: '#fafafa',
+  dark: '#1a1a1d',
 }
 
 export function ThemeToggle() {

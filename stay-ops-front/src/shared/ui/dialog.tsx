@@ -52,7 +52,7 @@ export function Dialog({
         aria-label="닫기"
         tabIndex={-1}
         onClick={closeOnBackdrop ? onClose : undefined}
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-[var(--backdrop)]"
       />
       <div
         ref={panelRef}
