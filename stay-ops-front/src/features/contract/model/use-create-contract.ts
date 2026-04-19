@@ -8,6 +8,7 @@ export function useCreateContract() {
     mutationFn: (body: CreateContractPayload) => contractApi.create(body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['contracts'] })
+      qc.invalidateQueries({ queryKey: ['rooms'] })
     },
   })
 }

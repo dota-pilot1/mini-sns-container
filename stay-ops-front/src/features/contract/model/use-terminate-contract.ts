@@ -11,6 +11,7 @@ export function useTerminateContract() {
       contractApi.terminate(contractId, terminationDate),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['contracts'] })
+      qc.invalidateQueries({ queryKey: ['rooms'] })
     },
   })
 }
