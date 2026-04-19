@@ -14,7 +14,6 @@ import {
   RegisterPaymentDialog,
   type RegisterPaymentTarget,
 } from '@/features/payment/ui/register-payment-dialog'
-import { TenantPaymentsHistorySection } from '@/features/payment/ui/tenant-payments-history-section'
 import type { TenantResponse } from '@/features/tenant/api/tenant-api'
 import { useDeleteTenant } from '@/features/tenant/model/use-delete-tenant'
 import { useUpdateTenant } from '@/features/tenant/model/use-update-tenant'
@@ -74,12 +73,16 @@ export function TenantDetailDrawer({
     return () => window.removeEventListener('keydown', onKey)
   }, [tenant, terminateTarget, deleteOpen, mode, onClose])
 
-  if (!tenant) return null
-
-  const tenantContracts = contracts
-    .filter((c) => c.tenantId === tenant.tenantId)
-    .slice()
-    .sort((a, b) => b.startDate.localeCompare(a.startDate))
+  const tenantContracts = useMemo(
+    () =>
+      tenant
+        ? contracts
+            .filter((c) => c.tenantId === tenant.tenantId)
+            .slice()
+            .sort((a, b) => b.startDate.localeCompare(a.startDate))
+        : [],
+    [contracts, tenant],
+  )
 
   const activeContract = tenantContracts.find((c) => c.status === 'ACTIVE') ?? null
 
@@ -88,18 +91,21 @@ export function TenantDetailDrawer({
     activeContract ? { contractId: activeContract.contractId, period } : {},
     { enabled: !!activeContract },
   )
-  const thisMonthPaid = activeContract
-    ? monthPayments.find((p) => p.status === 'PAID') ?? null
-    : null
-  const thisMonthRefunded = activeContract
-    ? monthPayments.some((p) => p.status === 'REFUNDED' && !thisMonthPaid)
-    : false
 
   const occupiedRoomIds = useMemo(() => {
     const set = new Set<string>()
     for (const c of contracts) if (c.status === 'ACTIVE') set.add(c.roomId)
     return set
   }, [contracts])
+
+  if (!tenant) return null
+
+  const thisMonthPaid = activeContract
+    ? monthPayments.find((p) => p.status === 'PAID') ?? null
+    : null
+  const thisMonthRefunded = activeContract
+    ? monthPayments.some((p) => p.status === 'REFUNDED' && !thisMonthPaid)
+    : false
 
   return (
     <div className="fixed inset-0 z-40">
@@ -127,10 +133,6 @@ export function TenantDetailDrawer({
               period={period}
               thisMonthPaid={thisMonthPaid}
               thisMonthRefundedOnly={thisMonthRefunded}
-            />
-            <TenantPaymentsHistorySection
-              contracts={tenantContracts}
-              roomNumberById={roomNumberById}
             />
             <ContractsSection
               contracts={tenantContracts}
