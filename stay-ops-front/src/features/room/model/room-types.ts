@@ -25,14 +25,14 @@ export const ROOM_STATUS_LABEL: Record<RoomStatus, string> = {
 }
 
 /**
- * 사이드바 상태 섹션 노출 순서 (운영 우선순위: 긴급도 높은 순).
+ * 사이드바·칸반 노출 순서. 입주 라이프사이클 따라 공실→예약→입실→청소→문제.
  */
 export const ROOM_STATUS_ORDER: RoomStatus[] = [
   'VACANT',
-  'OCCUPIED',
   'RESERVED',
-  'MAINTENANCE',
+  'OCCUPIED',
   'CLEANING',
+  'MAINTENANCE',
 ]
 
 /**
