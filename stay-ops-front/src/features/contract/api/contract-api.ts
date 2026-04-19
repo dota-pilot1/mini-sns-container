@@ -1,7 +1,5 @@
 import { apiFetch } from '@/shared/api/client'
 
-import type { ContractStatus } from '@/features/contract/model/contract-types'
-
 export type ContractResponse = {
   contractId: string
   tenantId: string
@@ -10,7 +8,6 @@ export type ContractResponse = {
   endDate: string
   monthlyRent: number
   deposit: number
-  status: ContractStatus
   previousContractId: string | null
   createdAt: string
   updatedAt: string
@@ -54,14 +51,15 @@ export type CancelOccupancyResponse = {
 export type ListContractsParams = {
   tenantId?: string
   roomId?: string
-  status?: ContractStatus
+  /** ISO date (YYYY-MM-DD). 주어지면 해당 날짜에 유효한 계약만 반환. */
+  effectiveOn?: string
 }
 
 function buildQuery(params: ListContractsParams): string {
   const entries: [string, string][] = []
   if (params.tenantId) entries.push(['tenantId', params.tenantId])
   if (params.roomId) entries.push(['roomId', params.roomId])
-  if (params.status) entries.push(['status', params.status])
+  if (params.effectiveOn) entries.push(['effectiveOn', params.effectiveOn])
   if (entries.length === 0) return ''
   return `?${new URLSearchParams(entries).toString()}`
 }

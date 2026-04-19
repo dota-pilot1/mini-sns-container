@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.cj.stayops.backend.contract.domain.model.Contract;
-import com.cj.stayops.backend.contract.domain.model.ContractStatus;
 import com.cj.stayops.backend.contract.domain.repository.ContractRepository;
 import com.cj.stayops.backend.payment.application.dto.OverduePaymentResult;
 import com.cj.stayops.backend.payment.domain.model.PeriodYearMonth;
@@ -55,8 +54,9 @@ public class ListOverdueUseCase {
 
 	@Transactional(readOnly = true)
 	public List<OverduePaymentResult> execute(PeriodYearMonth period) {
+		// 기준월 내에 걸치는 계약 = 계약 범위와 기준월 범위가 겹치는 모든 non-deleted 계약.
 		List<Contract> activeContracts = contractRepository
-			.findAll(null, null, ContractStatus.ACTIVE).stream()
+			.findAll(null, null).stream()
 			.filter(c -> period.isWithin(c.startDate(), c.endDate()))
 			.toList();
 		if (activeContracts.isEmpty()) {

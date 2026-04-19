@@ -21,9 +21,11 @@ import com.cj.stayops.backend.contract.application.ExtendAndPayUseCase;
 import com.cj.stayops.backend.contract.application.GetContractUseCase;
 import com.cj.stayops.backend.contract.application.ListContractsUseCase;
 import com.cj.stayops.backend.contract.application.TerminateContractUseCase;
+import java.time.LocalDate;
+import org.springframework.format.annotation.DateTimeFormat;
+
 import com.cj.stayops.backend.contract.application.dto.ContractResult;
 import com.cj.stayops.backend.contract.application.dto.ListContractsQuery;
-import com.cj.stayops.backend.contract.domain.model.ContractStatus;
 import com.cj.stayops.backend.contract.presentation.dto.CancelOccupancyRequest;
 import com.cj.stayops.backend.contract.presentation.dto.CancelOccupancyResponse;
 import com.cj.stayops.backend.contract.presentation.dto.ContractResponse;
@@ -73,14 +75,15 @@ public class ContractController {
 	}
 
 	@GetMapping
-	@Operation(summary = "계약 목록 조회", description = "tenantId/roomId/status 필터 지원.")
+	@Operation(summary = "계약 목록 조회",
+		description = "tenantId/roomId 필터. effectiveOn 을 주면 해당 날짜에 유효한(startDate ≤ date ≤ endDate) 계약만 반환.")
 	public ResponseEntity<List<ContractResponse>> list(
 		@RequestParam(required = false) UUID tenantId,
 		@RequestParam(required = false) UUID roomId,
-		@RequestParam(required = false) ContractStatus status
+		@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate effectiveOn
 	) {
 		List<ContractResponse> items = listContractsUseCase.execute(
-				new ListContractsQuery(tenantId, roomId, status)
+				new ListContractsQuery(tenantId, roomId, effectiveOn)
 			).stream()
 			.map(ContractResponse::from)
 			.toList();

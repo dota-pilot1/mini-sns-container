@@ -247,7 +247,7 @@ function TenantsSection({ roomId, roomNumber }: { roomId: string; roomNumber: st
   const { data: tenants = [], isLoading: tenantsLoading } = useTenantsQuery()
   const { data: contracts = [], isLoading: contractsLoading } = useContractsQuery({
     roomId,
-    status: 'ACTIVE',
+    effectiveOn: todayLocalISO(),
   })
 
   const linked = useMemo(() => {

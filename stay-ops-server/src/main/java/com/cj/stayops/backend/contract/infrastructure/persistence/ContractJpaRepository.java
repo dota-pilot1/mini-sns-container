@@ -1,5 +1,6 @@
 package com.cj.stayops.backend.contract.infrastructure.persistence;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,22 +13,36 @@ import org.springframework.transaction.annotation.Transactional;
 
 public interface ContractJpaRepository extends JpaRepository<ContractJpaEntity, UUID> {
 
-	/** 소프트 삭제되지 않은 계약만 — 일반 조회용. */
+	/** 소프트 삭제되지 않은 계약 전체 — 일반 조회용. */
 	@Query("""
 		SELECT c FROM ContractJpaEntity c
 		WHERE c.deletedAt IS NULL
 		  AND (:tenantId IS NULL OR c.tenantId = :tenantId)
 		  AND (:roomId IS NULL OR c.roomId = :roomId)
-		  AND (:status IS NULL OR c.status = :status)
 		ORDER BY c.createdAt DESC
 		""")
 	List<ContractJpaEntity> findAllByFilters(
 		@Param("tenantId") UUID tenantId,
-		@Param("roomId") UUID roomId,
-		@Param("status") String status
+		@Param("roomId") UUID roomId
 	);
 
-	/** 소프트 삭제 포함 단건 조회 — 리포지토리 내부용 (save 전 존재 확인 등). */
+	/** 주어진 날짜에 유효한(startDate ≤ date ≤ endDate) 소프트 삭제되지 않은 계약. */
+	@Query("""
+		SELECT c FROM ContractJpaEntity c
+		WHERE c.deletedAt IS NULL
+		  AND c.startDate <= :asOf
+		  AND c.endDate >= :asOf
+		  AND (:tenantId IS NULL OR c.tenantId = :tenantId)
+		  AND (:roomId IS NULL OR c.roomId = :roomId)
+		ORDER BY c.createdAt DESC
+		""")
+	List<ContractJpaEntity> findEffective(
+		@Param("asOf") LocalDate asOf,
+		@Param("tenantId") UUID tenantId,
+		@Param("roomId") UUID roomId
+	);
+
+	/** 소프트 삭제 제외 단건 조회. */
 	@Query("SELECT c FROM ContractJpaEntity c WHERE c.id = :id AND c.deletedAt IS NULL")
 	Optional<ContractJpaEntity> findByIdActive(@Param("id") UUID id);
 

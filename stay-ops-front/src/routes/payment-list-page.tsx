@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 
 import type { ContractResponse } from '@/features/contract/api/contract-api'
+import { isEffective } from '@/features/contract/model/contract-types'
 import { useContractsQuery } from '@/features/contract/model/use-contracts'
 import { ExtendAndPayDialog } from '@/features/contract/ui/extend-and-pay-dialog'
 import type { PaymentResponse } from '@/features/payment/api/payment-api'
@@ -110,7 +111,7 @@ export function PaymentListPage() {
     const qName = tenantSearch.trim().toLowerCase()
     const qRoom = roomSearch.trim().toLowerCase()
     return contracts
-      .filter((c) => c.status === 'ACTIVE')
+      .filter((c) => isEffective(c))
       .map((c) => ({ contract: c, days: daysUntil(c.endDate) }))
       .filter((x) => x.days <= EXPIRING_WINDOW_DAYS)
       .filter((x) => {

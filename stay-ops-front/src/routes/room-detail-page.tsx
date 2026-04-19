@@ -2,6 +2,12 @@ import { useNavigate, useParams } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 
 import { useContractsQuery } from '@/features/contract/model/use-contracts'
+
+function roomDetailTodayISO(): string {
+  const d = new Date()
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
+  return d.toISOString().slice(0, 10)
+}
 import { RecentPaymentsSection } from '@/features/payment/ui/recent-payments-section'
 import type { RoomResponse } from '@/features/room/api/room-api'
 import {
@@ -223,7 +229,7 @@ function TenantsSection({ roomId }: { roomId: string }) {
   const { data: tenants = [], isLoading: tenantsLoading } = useTenantsQuery()
   const { data: contracts = [], isLoading: contractsLoading } = useContractsQuery({
     roomId,
-    status: 'ACTIVE',
+    effectiveOn: roomDetailTodayISO(),
   })
 
   const linked = useMemo(() => {

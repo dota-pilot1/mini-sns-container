@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Test;
 import com.cj.stayops.backend.contract.domain.exception.ContractNotFoundException;
 import com.cj.stayops.backend.contract.domain.model.Contract;
 import com.cj.stayops.backend.contract.domain.model.ContractId;
-import com.cj.stayops.backend.contract.domain.model.ContractStatus;
 import com.cj.stayops.backend.contract.domain.repository.ContractRepository;
 import com.cj.stayops.backend.payment.application.dto.PaymentResult;
 import com.cj.stayops.backend.payment.application.dto.RegisterPaymentCommand;
@@ -221,11 +220,21 @@ class RegisterManualPaymentUseCaseTest {
 		}
 
 		@Override
-		public List<Contract> findAll(UUID tenantId, UUID roomId, ContractStatus status) {
+		public List<Contract> findAll(UUID tenantId, UUID roomId) {
 			return byId.values().stream()
+				.filter(c -> c.deletedAt() == null)
 				.filter(c -> tenantId == null || c.tenantId().equals(tenantId))
 				.filter(c -> roomId == null || c.roomId().equals(roomId))
-				.filter(c -> status == null || c.status() == status)
+				.toList();
+		}
+
+		@Override
+		public List<Contract> findEffective(java.time.LocalDate asOf, UUID tenantId, UUID roomId) {
+			return byId.values().stream()
+				.filter(c -> c.deletedAt() == null)
+				.filter(c -> !asOf.isBefore(c.startDate()) && !asOf.isAfter(c.endDate()))
+				.filter(c -> tenantId == null || c.tenantId().equals(tenantId))
+				.filter(c -> roomId == null || c.roomId().equals(roomId))
 				.toList();
 		}
 

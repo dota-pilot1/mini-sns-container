@@ -11,6 +11,12 @@ function thisMonthString(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
+function todayLocalISO(): string {
+  const d = new Date()
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
+  return d.toISOString().slice(0, 10)
+}
+
 /**
  * 방 ID 기준 이번 달 결제 상태 맵.
  * <p>
@@ -29,7 +35,7 @@ export function useRoomPaymentStatusMap(): {
 } {
   const period = thisMonthString()
   const { data: contracts = [], isLoading: contractsLoading } = useContractsQuery({
-    status: 'ACTIVE',
+    effectiveOn: todayLocalISO(),
   })
   const { data: payments = [], isLoading: paymentsLoading } = usePaymentsQuery({ period })
 

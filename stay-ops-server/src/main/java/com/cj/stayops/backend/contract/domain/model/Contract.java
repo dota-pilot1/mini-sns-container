@@ -14,15 +14,22 @@ import com.cj.stayops.backend.contract.domain.exception.InvalidContractFieldExce
  * Room 의 현재 값이 바뀌더라도 이 계약은 기존 금액을 유지한다.
  * <p>
  * 재계약/연장은 이 계약을 수정하는 것이 아니라 새 Contract 를 {@code previousContractId} 로
- * 체인 연결해 생성한다. 즉 계약은 불변 레코드이며, 한번 만들어진 기간/금액은 도메인 메서드로
- * 바뀌지 않는다 (상태 전이 = TERMINATED / 소프트 삭제만 허용).
+ * 체인 연결해 생성한다. 상태 enum 은 두지 않는다 — 계약의 "유효함" 은 날짜 + 소프트 삭제에서
+ * 파생된다. 중도 취소는 endDate 를 취소일로 단축할 뿐 별도 status flip 을 쓰지 않는다.
+ * <p>
+ * 파생 상태 (저장되지 않음):
+ * <ul>
+ *   <li>{@code today < startDate} → 예정</li>
+ *   <li>{@code startDate ≤ today ≤ endDate} → 거주중 (effective)</li>
+ *   <li>{@code today > endDate} → 지나간 계약 (자연 만료든 중도 취소든)</li>
+ *   <li>{@code deletedAt != null} → 소프트 삭제, 모든 조회에서 제외</li>
+ * </ul>
  * <p>
  * 불변식:
  * <ul>
  *   <li>startDate ≤ endDate</li>
  *   <li>monthlyRent ≥ 0, deposit ≥ 0</li>
- *   <li>ACTIVE 상태에서만 terminate 가능</li>
- *   <li>소프트 삭제된 계약은 모든 조회에서 제외된다 (리포지토리 레벨)</li>
+ *   <li>endDate 는 단축만 가능 (truncateEndDate), 늘릴 수 없음</li>
  * </ul>
  */
 public class Contract {
@@ -34,16 +41,14 @@ public class Contract {
 	private final LocalDate endDate;
 	private final long monthlyRent;   // 원
 	private final long deposit;       // 원
-	private final ContractStatus status;
 	private final ContractId previousContractId;   // 재계약 체인 — 원계약이면 null
-	private final Instant deletedAt;               // 소프트 삭제 — null 이면 활성
+	private final Instant deletedAt;               // 소프트 삭제 — null 이면 유효 레코드
 	private final Instant createdAt;
 	private final Instant updatedAt;
 
 	private Contract(ContractId id, UUID tenantId, UUID roomId,
 					 LocalDate startDate, LocalDate endDate,
 					 long monthlyRent, long deposit,
-					 ContractStatus status,
 					 ContractId previousContractId,
 					 Instant deletedAt,
 					 Instant createdAt, Instant updatedAt) {
@@ -54,7 +59,6 @@ public class Contract {
 		this.endDate = Objects.requireNonNull(endDate, "endDate");
 		this.monthlyRent = monthlyRent;
 		this.deposit = deposit;
-		this.status = Objects.requireNonNull(status, "status");
 		this.previousContractId = previousContractId;
 		this.deletedAt = deletedAt;
 		this.createdAt = Objects.requireNonNull(createdAt, "createdAt");
@@ -82,7 +86,7 @@ public class Contract {
 		validateAmount("deposit", deposit);
 		return new Contract(
 			id, tenantId, roomId, startDate, endDate,
-			monthlyRent, deposit, ContractStatus.ACTIVE,
+			monthlyRent, deposit,
 			previousContractId, null, now, now
 		);
 	}
@@ -90,35 +94,37 @@ public class Contract {
 	public static Contract reconstitute(ContractId id, UUID tenantId, UUID roomId,
 										LocalDate startDate, LocalDate endDate,
 										long monthlyRent, long deposit,
-										ContractStatus status,
 										ContractId previousContractId,
 										Instant deletedAt,
 										Instant createdAt, Instant updatedAt) {
 		return new Contract(id, tenantId, roomId, startDate, endDate,
-			monthlyRent, deposit, status, previousContractId, deletedAt, createdAt, updatedAt);
+			monthlyRent, deposit, previousContractId, deletedAt, createdAt, updatedAt);
 	}
 
-	/** 중도 퇴실 — ACTIVE → TERMINATED, endDate 를 종료일로 업데이트. */
-	public Contract terminate(LocalDate terminationDate, Instant now) {
-		if (status != ContractStatus.ACTIVE) {
-			throw new InvalidContractFieldException("status",
-				"활성 계약만 종료할 수 있습니다. 현재 상태: " + status);
-		}
-		Objects.requireNonNull(terminationDate, "terminationDate");
-		if (terminationDate.isBefore(startDate)) {
-			throw new InvalidContractFieldException("terminationDate",
+	/**
+	 * 중도 취소 — endDate 를 취소일로 단축.
+	 * <p>원래 endDate 보다 뒤의 날짜는 거부 (계약 기간은 늘릴 수 없음).
+	 * startDate 보다 앞의 날짜도 거부.
+	 */
+	public Contract truncateEndDate(LocalDate newEndDate, Instant now) {
+		Objects.requireNonNull(newEndDate, "newEndDate");
+		if (newEndDate.isBefore(startDate)) {
+			throw new InvalidContractFieldException("newEndDate",
 				"종료일은 시작일 이후여야 합니다.");
 		}
-		return new Contract(id, tenantId, roomId, startDate, terminationDate,
-			monthlyRent, deposit, ContractStatus.TERMINATED,
-			previousContractId, deletedAt, createdAt, now);
+		if (newEndDate.isAfter(endDate)) {
+			throw new InvalidContractFieldException("newEndDate",
+				"endDate 는 단축만 가능합니다. 연장은 새 계약을 추가하세요.");
+		}
+		return new Contract(id, tenantId, roomId, startDate, newEndDate,
+			monthlyRent, deposit, previousContractId, deletedAt, createdAt, now);
 	}
 
 	/** 소프트 삭제 — 이미 삭제된 경우 no-op. */
 	public Contract softDelete(Instant now) {
 		if (deletedAt != null) return this;
 		return new Contract(id, tenantId, roomId, startDate, endDate,
-			monthlyRent, deposit, status,
+			monthlyRent, deposit,
 			previousContractId, now, createdAt, now);
 	}
 
@@ -148,14 +154,19 @@ public class Contract {
 	public LocalDate endDate() { return endDate; }
 	public long monthlyRent() { return monthlyRent; }
 	public long deposit() { return deposit; }
-	public ContractStatus status() { return status; }
 	public ContractId previousContractId() { return previousContractId; }
 	public Instant deletedAt() { return deletedAt; }
 	public Instant createdAt() { return createdAt; }
 	public Instant updatedAt() { return updatedAt; }
 
-	public boolean isActive() { return status == ContractStatus.ACTIVE && deletedAt == null; }
 	public boolean isDeleted() { return deletedAt != null; }
+
+	/** 주어진 날짜에 계약이 유효한지 — deletedAt IS NULL AND startDate ≤ date ≤ endDate. */
+	public boolean isEffectiveOn(LocalDate date) {
+		if (deletedAt != null) return false;
+		Objects.requireNonNull(date, "date");
+		return !date.isBefore(startDate) && !date.isAfter(endDate);
+	}
 
 	@Override
 	public boolean equals(Object o) {

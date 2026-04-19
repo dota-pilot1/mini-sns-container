@@ -1,5 +1,6 @@
 package com.cj.stayops.backend.contract.infrastructure.persistence;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -8,7 +9,6 @@ import org.springframework.stereotype.Repository;
 
 import com.cj.stayops.backend.contract.domain.model.Contract;
 import com.cj.stayops.backend.contract.domain.model.ContractId;
-import com.cj.stayops.backend.contract.domain.model.ContractStatus;
 import com.cj.stayops.backend.contract.domain.repository.ContractRepository;
 
 @Repository
@@ -32,11 +32,15 @@ public class ContractRepositoryImpl implements ContractRepository {
 	}
 
 	@Override
-	public List<Contract> findAll(UUID tenantId, UUID roomId, ContractStatus status) {
-		return jpaRepository.findAllByFilters(
-				tenantId, roomId,
-				status == null ? null : status.name()
-			).stream()
+	public List<Contract> findAll(UUID tenantId, UUID roomId) {
+		return jpaRepository.findAllByFilters(tenantId, roomId).stream()
+			.map(this::toDomain)
+			.toList();
+	}
+
+	@Override
+	public List<Contract> findEffective(LocalDate asOf, UUID tenantId, UUID roomId) {
+		return jpaRepository.findEffective(asOf, tenantId, roomId).stream()
 			.map(this::toDomain)
 			.toList();
 	}
@@ -55,7 +59,6 @@ public class ContractRepositoryImpl implements ContractRepository {
 			c.endDate(),
 			c.monthlyRent(),
 			c.deposit(),
-			c.status().name(),
 			c.previousContractId() == null ? null : c.previousContractId().value(),
 			c.deletedAt(),
 			c.createdAt(),
@@ -72,7 +75,6 @@ public class ContractRepositoryImpl implements ContractRepository {
 			e.getEndDate(),
 			e.getMonthlyRent(),
 			e.getDeposit(),
-			ContractStatus.valueOf(e.getStatus()),
 			e.getPreviousContractId() == null ? null : ContractId.of(e.getPreviousContractId()),
 			e.getDeletedAt(),
 			e.getCreatedAt(),

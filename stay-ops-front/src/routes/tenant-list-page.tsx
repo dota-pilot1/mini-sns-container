@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from 'react'
 
 import type { TenantsSearch } from '@/app/router'
 import type { ContractResponse } from '@/features/contract/api/contract-api'
+import { isEffective } from '@/features/contract/model/contract-types'
 import { useContractsQuery } from '@/features/contract/model/use-contracts'
 import { CancelOccupancyDialog } from '@/features/contract/ui/cancel-occupancy-dialog'
 import { useRoomsQuery } from '@/features/room/model/use-rooms'
@@ -101,7 +102,7 @@ export function TenantListPage() {
     const list: ActiveEntry[] = []
     for (const tenant of tenants) {
       const tc = contractsByTenant.get(tenant.tenantId) ?? []
-      const active = tc.find((c) => c.status === 'ACTIVE')
+      const active = tc.find((c) => isEffective(c))
       if (active) {
         list.push({
           tenant,
@@ -123,7 +124,7 @@ export function TenantListPage() {
     const list: MovedOutEntry[] = []
     for (const tenant of tenants) {
       const tc = contractsByTenant.get(tenant.tenantId) ?? []
-      if (tc.some((c) => c.status === 'ACTIVE')) continue
+      if (tc.some((c) => isEffective(c))) continue
       const last = tc[0] ?? null
       list.push({
         tenant,

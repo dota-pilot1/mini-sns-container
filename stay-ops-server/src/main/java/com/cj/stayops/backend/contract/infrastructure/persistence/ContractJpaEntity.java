@@ -14,9 +14,9 @@ import jakarta.persistence.Table;
 @Table(name = "contracts", indexes = {
 	@Index(name = "idx_contracts_tenant", columnList = "tenant_id"),
 	@Index(name = "idx_contracts_room", columnList = "room_id"),
-	@Index(name = "idx_contracts_status", columnList = "status"),
 	@Index(name = "idx_contracts_previous", columnList = "previous_contract_id"),
-	@Index(name = "idx_contracts_deleted_at", columnList = "deleted_at")
+	@Index(name = "idx_contracts_deleted_at", columnList = "deleted_at"),
+	@Index(name = "idx_contracts_end_date", columnList = "end_date")
 })
 public class ContractJpaEntity {
 
@@ -42,9 +42,6 @@ public class ContractJpaEntity {
 	@Column(nullable = false)
 	private long deposit;
 
-	@Column(nullable = false, length = 20)
-	private String status;
-
 	@Column(name = "previous_contract_id", columnDefinition = "uuid")
 	private UUID previousContractId;
 
@@ -61,7 +58,7 @@ public class ContractJpaEntity {
 
 	public ContractJpaEntity(UUID id, UUID tenantId, UUID roomId,
 							 LocalDate startDate, LocalDate endDate,
-							 long monthlyRent, long deposit, String status,
+							 long monthlyRent, long deposit,
 							 UUID previousContractId,
 							 Instant deletedAt,
 							 Instant createdAt, Instant updatedAt) {
@@ -72,7 +69,6 @@ public class ContractJpaEntity {
 		this.endDate = endDate;
 		this.monthlyRent = monthlyRent;
 		this.deposit = deposit;
-		this.status = status;
 		this.previousContractId = previousContractId;
 		this.deletedAt = deletedAt;
 		this.createdAt = createdAt;
@@ -86,7 +82,6 @@ public class ContractJpaEntity {
 	public LocalDate getEndDate() { return endDate; }
 	public long getMonthlyRent() { return monthlyRent; }
 	public long getDeposit() { return deposit; }
-	public String getStatus() { return status; }
 	public UUID getPreviousContractId() { return previousContractId; }
 	public Instant getDeletedAt() { return deletedAt; }
 	public Instant getCreatedAt() { return createdAt; }

@@ -21,7 +21,6 @@ import org.junit.jupiter.api.Test;
 
 import com.cj.stayops.backend.contract.domain.model.Contract;
 import com.cj.stayops.backend.contract.domain.model.ContractId;
-import com.cj.stayops.backend.contract.domain.model.ContractStatus;
 import com.cj.stayops.backend.payment.application.dto.OverduePaymentResult;
 import com.cj.stayops.backend.payment.application.dto.RegisterPaymentCommand;
 import com.cj.stayops.backend.payment.domain.model.PaymentMethod;
@@ -116,15 +115,15 @@ class ListOverdueUseCaseTest {
 	}
 
 	@Test
-	@DisplayName("TERMINATED 계약은 후보에서 빠진다")
-	void terminated_contract_excluded() {
+	@DisplayName("중도 취소로 endDate 가 기준월 전으로 단축된 계약은 후보에서 빠진다")
+	void truncated_contract_excluded() {
 		Tenant alice = tenantOf("Alice", "01011110000");
 		Room r701 = roomOf("701", 7);
 		Contract contract = Contract.create(
 			ContractId.generate(), alice.id().value(), r701.id().value(),
 			LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31),
 			410_000L, 3_000_000L, FIXED_NOW
-		).terminate(LocalDate.of(2026, 3, 31), FIXED_NOW);
+		).truncateEndDate(LocalDate.of(2026, 3, 31), FIXED_NOW);
 		contractRepository.save(contract);
 
 		List<OverduePaymentResult> overdue = listOverdueUseCase.execute(PeriodYearMonth.of("2026-04"));

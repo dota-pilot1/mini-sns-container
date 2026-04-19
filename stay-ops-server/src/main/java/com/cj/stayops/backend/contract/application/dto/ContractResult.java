@@ -4,7 +4,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 import com.cj.stayops.backend.contract.domain.model.Contract;
-import com.cj.stayops.backend.contract.domain.model.ContractStatus;
 
 public record ContractResult(
 	String contractId,
@@ -14,7 +13,6 @@ public record ContractResult(
 	LocalDate endDate,
 	long monthlyRent,
 	long deposit,
-	ContractStatus status,
 	String previousContractId,
 	Instant createdAt,
 	Instant updatedAt
@@ -28,7 +26,6 @@ public record ContractResult(
 			c.endDate(),
 			c.monthlyRent(),
 			c.deposit(),
-			c.status(),
 			c.previousContractId() == null ? null : c.previousContractId().asString(),
 			c.createdAt(),
 			c.updatedAt()

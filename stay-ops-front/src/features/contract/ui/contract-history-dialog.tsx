@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 
 import type { ContractResponse } from '@/features/contract/api/contract-api'
+import { isEffective } from '@/features/contract/model/contract-types'
 import { PaymentStatusPill } from '@/features/payment/ui/payment-status-pill'
 import { usePaymentsQuery } from '@/features/payment/model/use-payments'
 import { Dialog } from '@/shared/ui/dialog'
@@ -94,7 +95,7 @@ export function ContractHistoryDialog({
         ) : (
           <ul className="flex max-h-[60vh] flex-col gap-2 overflow-y-auto pr-1">
             {contracts.map((c) => {
-              const isActive = c.status === 'ACTIVE'
+              const isActive = isEffective(c)
               const paymentStatus = !isActive
                 ? null
                 : paidContractIds.has(c.contractId)

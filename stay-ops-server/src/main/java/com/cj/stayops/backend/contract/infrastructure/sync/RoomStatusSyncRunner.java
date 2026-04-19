@@ -2,6 +2,7 @@ package com.cj.stayops.backend.contract.infrastructure.sync;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -14,7 +15,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.cj.stayops.backend.contract.domain.model.Contract;
-import com.cj.stayops.backend.contract.domain.model.ContractStatus;
 import com.cj.stayops.backend.contract.domain.repository.ContractRepository;
 import com.cj.stayops.backend.room.domain.model.Room;
 import com.cj.stayops.backend.room.domain.model.RoomId;
@@ -52,8 +52,9 @@ public class RoomStatusSyncRunner implements ApplicationRunner {
 	@Transactional
 	public void run(org.springframework.boot.ApplicationArguments args) {
 		Instant now = Instant.now(clock);
+		LocalDate today = LocalDate.now(clock);
 		Set<UUID> activeRoomIds = new HashSet<>();
-		for (Contract c : contractRepository.findAll(null, null, ContractStatus.ACTIVE)) {
+		for (Contract c : contractRepository.findEffective(today, null, null)) {
 			activeRoomIds.add(c.roomId());
 		}
 

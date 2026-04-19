@@ -6,12 +6,12 @@ import java.time.Instant;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+
 import com.cj.stayops.backend.contract.domain.exception.ContractNotFoundException;
 import com.cj.stayops.backend.contract.domain.model.Contract;
 import com.cj.stayops.backend.contract.domain.model.ContractId;
-import com.cj.stayops.backend.contract.domain.model.ContractStatus;
 import com.cj.stayops.backend.contract.domain.repository.ContractRepository;
-import com.cj.stayops.backend.room.domain.model.Room;
 import com.cj.stayops.backend.room.domain.model.RoomId;
 import com.cj.stayops.backend.room.domain.model.RoomStatus;
 import com.cj.stayops.backend.room.domain.repository.RoomRepository;
@@ -47,14 +47,15 @@ public class DeleteContractUseCase {
 		Instant now = Instant.now(clock);
 		contractRepository.save(contract.softDelete(now));
 
-		releaseRoomIfNoOtherActive(contract.roomId(), id, now);
+		releaseRoomIfNoOtherEffective(contract.roomId(), id, LocalDate.now(clock), now);
 	}
 
-	private void releaseRoomIfNoOtherActive(java.util.UUID roomId, ContractId deletedId, Instant now) {
-		boolean hasOtherActive = contractRepository
-			.findAll(null, roomId, ContractStatus.ACTIVE).stream()
+	private void releaseRoomIfNoOtherEffective(java.util.UUID roomId, ContractId deletedId,
+											   LocalDate today, Instant now) {
+		boolean hasOtherEffective = contractRepository
+			.findEffective(today, null, roomId).stream()
 			.anyMatch(c -> !c.id().equals(deletedId));
-		if (hasOtherActive) {
+		if (hasOtherEffective) {
 			return;
 		}
 		roomRepository.findById(RoomId.of(roomId)).ifPresent(room -> {

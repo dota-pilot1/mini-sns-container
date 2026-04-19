@@ -20,8 +20,10 @@ public class ListContractsUseCase {
 
 	@Transactional(readOnly = true)
 	public List<ContractResult> execute(ListContractsQuery q) {
-		return contractRepository.findAll(q.tenantId(), q.roomId(), q.status())
-			.stream()
+		var contracts = q.effectiveOn() != null
+			? contractRepository.findEffective(q.effectiveOn(), q.tenantId(), q.roomId())
+			: contractRepository.findAll(q.tenantId(), q.roomId());
+		return contracts.stream()
 			.map(ContractResult::from)
 			.toList();
 	}

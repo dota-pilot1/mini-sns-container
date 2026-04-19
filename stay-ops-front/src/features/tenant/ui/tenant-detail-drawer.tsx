@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 import type { ContractResponse } from '@/features/contract/api/contract-api'
 import { useDeleteContract } from '@/features/contract/model/use-delete-contract'
+import { isEffective } from '@/features/contract/model/contract-types'
 import { AddContractDialog } from '@/features/contract/ui/add-contract-dialog'
 import { CancelOccupancyDialog } from '@/features/contract/ui/cancel-occupancy-dialog'
 import { ContractHistoryDialog } from '@/features/contract/ui/contract-history-dialog'
@@ -84,7 +85,7 @@ export function TenantDetailDrawer({
     [contracts, tenant],
   )
 
-  const activeContract = tenantContracts.find((c) => c.status === 'ACTIVE') ?? null
+  const activeContract = tenantContracts.find((c) => isEffective(c)) ?? null
 
   const period = thisMonthString()
   const { data: monthPayments = [] } = usePaymentsQuery(
@@ -94,7 +95,7 @@ export function TenantDetailDrawer({
 
   const occupiedRoomIds = useMemo(() => {
     const set = new Set<string>()
-    for (const c of contracts) if (c.status === 'ACTIVE') set.add(c.roomId)
+    for (const c of contracts) if (isEffective(c)) set.add(c.roomId)
     return set
   }, [contracts])
 
@@ -414,7 +415,7 @@ function ContractsSection({
   onRegisterPayment: (c: ContractResponse) => void
   onUndoPayment: (p: PaymentResponse) => void
 }) {
-  const hasActive = contracts.some((c) => c.status === 'ACTIVE')
+  const hasActive = contracts.some((c) => isEffective(c))
   const latest = contracts[0] ?? null
   const hasHistory = contracts.length > 1
 
@@ -467,7 +468,7 @@ function ContractsSection({
       ) : (
         <ul className="flex flex-col gap-2">
           {[latest].map((c) => {
-            const isActive = c.status === 'ACTIVE'
+            const isActive = isEffective(c)
             const monthPaid = isActive
               ? monthPayments.find(
                   (p) => p.contractId === c.contractId && p.status === 'PAID',
