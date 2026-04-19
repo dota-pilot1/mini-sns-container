@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 
 import type { ContractResponse } from '@/features/contract/api/contract-api'
-import { CONTRACT_STATUS_LABEL } from '@/features/contract/model/contract-types'
 import { useTerminateContract } from '@/features/contract/model/use-terminate-contract'
 import { RecentPaymentsSection } from '@/features/payment/ui/recent-payments-section'
 import type { TenantResponse } from '@/features/tenant/api/tenant-api'
@@ -247,7 +246,9 @@ function ContractsSection({
                 <span className="text-sm font-medium">
                   {roomNumberById[c.roomId] ? `${roomNumberById[c.roomId]}호` : c.roomId.slice(0, 8)}
                 </span>
-                <StatusChip status={c.status} />
+                <span className="text-[11px] tabular-nums text-[var(--muted)]">
+                  {formatRelativeContract(c.startDate)}
+                </span>
               </div>
               <div className="flex items-center justify-between text-xs text-[var(--muted)]">
                 <span>
@@ -275,18 +276,18 @@ function ContractsSection({
   )
 }
 
-function StatusChip({ status }: { status: ContractResponse['status'] }) {
-  const cls =
-    status === 'ACTIVE'
-      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
-      : status === 'TERMINATED'
-        ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300'
-        : 'bg-slate-500/15 text-slate-700 dark:text-slate-300'
-  return (
-    <span className={['rounded-md px-2 py-0.5 text-[10px] font-semibold', cls].join(' ')}>
-      {CONTRACT_STATUS_LABEL[status]}
-    </span>
-  )
+/** 계약 시작일 기준 상대 시간 라벨. "오늘 계약" / "N일 전 계약" / "N개월 전 계약" / "N년 전 계약". */
+function formatRelativeContract(startDate: string): string {
+  const start = new Date(startDate)
+  const today = new Date()
+  start.setHours(0, 0, 0, 0)
+  today.setHours(0, 0, 0, 0)
+  const diffDays = Math.round((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+  if (diffDays === 0) return '오늘 계약'
+  if (diffDays < 0) return `${-diffDays}일 후 시작`
+  if (diffDays < 31) return `${diffDays}일 전 계약`
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)}개월 전 계약`
+  return `${Math.floor(diffDays / 365)}년 전 계약`
 }
 
 function Footer({
