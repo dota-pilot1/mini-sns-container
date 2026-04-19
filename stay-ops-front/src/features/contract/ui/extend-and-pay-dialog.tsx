@@ -26,6 +26,14 @@ function addMonthString(isoDate: string, months: number): string {
   return `${targetYear}-${mm}-${dd}`
 }
 
+function addDaysString(isoDate: string, days: number): string {
+  const d = new Date(isoDate)
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() + days)
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
+  return d.toISOString().slice(0, 10)
+}
+
 type Props = {
   /** null 이면 닫힘. 기준이 되는(이전) 계약이 들어오면 열림. 새 계약은 이 계약의 체인에 추가됨. */
   contract: ContractResponse | null
@@ -71,20 +79,33 @@ export function ExtendAndPayDialog({
     [chain],
   )
 
+  // 기준 계약은 "가장 최근에 추가된 것" = 히스토리의 맨 위. 추가할 때마다 자동으로 갱신되어
+  // 다음 추가는 방금 추가한 계약에 체인으로 걸린다. 쿼리가 아직 로드되지 않았으면 prop 사용.
+  const baseContract = history[0] ?? contract
+
   useEffect(() => {
     if (open && contract) {
       setMonths(1)
-      setAmountPerMonth(contract.monthlyRent)
       setTopError(null)
     }
   }, [open, contract])
 
+  // baseContract 가 바뀌면 (처음 열렸을 때 or 추가 후 갱신) 월세 기본값을 승계.
+  // 사용자가 수동으로 바꾼 값이 있어도 새 기준 계약의 월세로 리셋한다.
+  const baseContractId = baseContract?.contractId
+  useEffect(() => {
+    if (baseContract) {
+      setAmountPerMonth(baseContract.monthlyRent)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseContractId])
+
   const total = amountPerMonth * months
-  const newStartDate = contract ? addMonthString(contract.endDate, 0 /* day-after handled below */) : ''
-  const projectedEndDate = contract ? addMonthString(contract.endDate, months) : ''
+  const newStartDate = baseContract ? addDaysString(baseContract.endDate, 1) : ''
+  const newEndDate = newStartDate ? addDaysString(addMonthString(newStartDate, months), -1) : ''
 
   const submit = async () => {
-    if (!contract) return
+    if (!baseContract) return
     if (months <= 0) {
       setTopError('기간은 1개월 이상이어야 합니다.')
       return
@@ -96,7 +117,7 @@ export function ExtendAndPayDialog({
     setTopError(null)
     try {
       await extendAndPay.mutateAsync({
-        contractId: contract.contractId,
+        contractId: baseContract.contractId,
         body: {
           months,
           amountPerMonth,
@@ -104,7 +125,9 @@ export function ExtendAndPayDialog({
         },
       })
       onDone?.()
-      onClose()
+      // 다이얼로그 유지 — 리스트가 갱신되고 baseContract 가 방금 추가된 계약으로 이동하므로
+      // 연속으로 추가할 수 있다. 기간만 +1달 기본값으로 리셋.
+      setMonths(1)
     } catch (err) {
       setTopError(
         err instanceof ApiError
@@ -157,7 +180,7 @@ export function ExtendAndPayDialog({
             <ul className="flex max-h-[340px] flex-col gap-1.5 overflow-y-auto pr-1">
               {history.map((c) => {
                 const state = deriveContractState(c)
-                const isBase = contract?.contractId === c.contractId
+                const isBase = baseContract?.contractId === c.contractId
                 return (
                   <li
                     key={c.contractId}
@@ -207,15 +230,15 @@ export function ExtendAndPayDialog({
 
         {/* Right: 새 계약 폼 */}
         <section className="flex flex-col gap-4 p-5">
-          {contract ? (
+          {baseContract ? (
             <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 rounded-lg border border-[var(--border)] bg-[var(--control)] px-3 py-2.5 text-xs">
               <dt className="text-[var(--muted)]">기준 계약 종료일</dt>
               <dd className="text-right tabular-nums text-[var(--foreground)]">
-                {dateOnlyFmt.format(new Date(contract.endDate))}
+                {dateOnlyFmt.format(new Date(baseContract.endDate))}
               </dd>
               <dt className="text-[var(--muted)]">월세 (승계)</dt>
               <dd className="text-right tabular-nums text-[var(--foreground)]">
-                {numberFmt.format(contract.monthlyRent)}원
+                {numberFmt.format(baseContract.monthlyRent)}원
               </dd>
             </dl>
           ) : null}
@@ -256,9 +279,13 @@ export function ExtendAndPayDialog({
           </label>
 
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-3 py-2.5 text-xs">
-            <dt className="text-[var(--muted)]">새 계약 종료일</dt>
+            <dt className="text-[var(--muted)]">시작일</dt>
             <dd className="text-right tabular-nums font-semibold text-[var(--foreground)]">
-              {projectedEndDate ? dateOnlyFmt.format(new Date(projectedEndDate)) : '—'}
+              {newStartDate ? dateOnlyFmt.format(new Date(newStartDate)) : '—'}
+            </dd>
+            <dt className="text-[var(--muted)]">종료일</dt>
+            <dd className="text-right tabular-nums font-semibold text-[var(--foreground)]">
+              {newEndDate ? dateOnlyFmt.format(new Date(newEndDate)) : '—'}
             </dd>
             <dt className="text-[var(--muted)]">총 결제 금액</dt>
             <dd className="text-right tabular-nums font-semibold text-[var(--accent)]">
@@ -275,7 +302,7 @@ export function ExtendAndPayDialog({
               disabled={extendAndPay.isPending}
               className="rounded-lg border border-[var(--border)] bg-[var(--control)] px-3 py-2 text-sm font-medium text-[var(--foreground)] transition hover:bg-[var(--control-hover)] disabled:opacity-60"
             >
-              취소
+              닫기
             </button>
             <button
               type="button"
