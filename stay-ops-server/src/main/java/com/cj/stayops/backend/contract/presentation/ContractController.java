@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.cj.stayops.backend.contract.application.CreateContractUseCase;
+import com.cj.stayops.backend.contract.application.DeleteContractUseCase;
 import com.cj.stayops.backend.contract.application.GetContractUseCase;
 import com.cj.stayops.backend.contract.application.ListContractsUseCase;
 import com.cj.stayops.backend.contract.application.TerminateContractUseCase;
@@ -37,15 +39,18 @@ public class ContractController {
 	private final ListContractsUseCase listContractsUseCase;
 	private final GetContractUseCase getContractUseCase;
 	private final TerminateContractUseCase terminateContractUseCase;
+	private final DeleteContractUseCase deleteContractUseCase;
 
 	public ContractController(CreateContractUseCase createContractUseCase,
 							  ListContractsUseCase listContractsUseCase,
 							  GetContractUseCase getContractUseCase,
-							  TerminateContractUseCase terminateContractUseCase) {
+							  TerminateContractUseCase terminateContractUseCase,
+							  DeleteContractUseCase deleteContractUseCase) {
 		this.createContractUseCase = createContractUseCase;
 		this.listContractsUseCase = listContractsUseCase;
 		this.getContractUseCase = getContractUseCase;
 		this.terminateContractUseCase = terminateContractUseCase;
+		this.deleteContractUseCase = deleteContractUseCase;
 	}
 
 	@PostMapping
@@ -74,6 +79,15 @@ public class ContractController {
 	@Operation(summary = "계약 상세 조회")
 	public ResponseEntity<ContractResponse> get(@PathVariable String contractId) {
 		return ResponseEntity.ok(ContractResponse.from(getContractUseCase.execute(contractId)));
+	}
+
+	@DeleteMapping("/{contractId}")
+	@Operation(summary = "계약 완전 삭제",
+		description = "잘못 입력한 계약 복구용. 결제 레코드도 함께 hard-delete 되며, "
+			+ "정상 종료는 /terminate 사용. 방의 다른 ACTIVE 계약이 없으면 Room 상태도 VACANT 로 되돌림.")
+	public ResponseEntity<Void> delete(@PathVariable String contractId) {
+		deleteContractUseCase.execute(contractId);
+		return ResponseEntity.noContent().build();
 	}
 
 	@PostMapping("/{contractId}/terminate")

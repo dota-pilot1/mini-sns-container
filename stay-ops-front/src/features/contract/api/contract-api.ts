@@ -58,4 +58,7 @@ export const contractApi = {
       body: JSON.stringify({ terminationDate: terminationDate ?? null }),
     })
   },
+  remove(contractId: string): Promise<void> {
+    return apiFetch<void>(`/api/contracts/${contractId}`, { method: 'DELETE' })
+  },
 }
