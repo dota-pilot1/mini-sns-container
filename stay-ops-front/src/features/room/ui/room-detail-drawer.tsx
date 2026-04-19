@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from 'react'
 
 import type { ContractResponse } from '@/features/contract/api/contract-api'
 import { useContractsQuery } from '@/features/contract/model/use-contracts'
+import { CancelOccupancyDialog } from '@/features/contract/ui/cancel-occupancy-dialog'
+import { ExtendAndPayDialog } from '@/features/contract/ui/extend-and-pay-dialog'
 import { usePaymentsQuery } from '@/features/payment/model/use-payments'
 import { PaymentStatusPill } from '@/features/payment/ui/payment-status-pill'
 import type { RoomResponse } from '@/features/room/api/room-api'
@@ -89,7 +91,7 @@ export function RoomDetailDrawer({ room, onClose }: Props) {
         {mode === 'view' ? (
           <>
             <StatusSection room={room} />
-            <TenantsSection roomId={room.roomId} />
+            <TenantsSection roomId={room.roomId} roomNumber={room.roomNumber} />
             <InfoSection room={room} />
             <Footer
               onEdit={() => setMode('edit')}
@@ -232,8 +234,16 @@ function StatusSection({ room }: { room: RoomResponse }) {
 
 /* ───── Tenants (현재 이 방에 거주/예약된 입주자) ───── */
 
-function TenantsSection({ roomId }: { roomId: string }) {
+function TenantsSection({ roomId, roomNumber }: { roomId: string; roomNumber: string }) {
   const navigate = useNavigate()
+  const [extendTarget, setExtendTarget] = useState<{
+    contract: ContractResponse
+    tenant: TenantResponse
+  } | null>(null)
+  const [cancelTarget, setCancelTarget] = useState<{
+    contract: ContractResponse
+    tenant: TenantResponse
+  } | null>(null)
   const { data: tenants = [], isLoading: tenantsLoading } = useTenantsQuery()
   const { data: contracts = [], isLoading: contractsLoading } = useContractsQuery({
     roomId,
@@ -247,6 +257,8 @@ function TenantsSection({ roomId }: { roomId: string }) {
       .filter((x): x is { contract: typeof x.contract; tenant: TenantResponse } => !!x.tenant)
   }, [tenants, contracts])
 
+  const sole = linked.length === 1 ? linked[0] : null
+
   const goToTenant = (tenantId: string) => {
     navigate({
       to: '/tenants',
@@ -256,9 +268,29 @@ function TenantsSection({ roomId }: { roomId: string }) {
 
   return (
     <section className="border-t border-[var(--border)] px-5 pt-4">
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-        현재 입주자
-      </h3>
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+          현재 입주자
+        </h3>
+        {sole ? (
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setExtendTarget(sole)}
+              className="rounded-md border border-[var(--border)] bg-[var(--control)] px-2 py-1 text-[11px] font-medium text-[var(--foreground)] transition hover:border-[var(--accent)] hover:bg-[var(--control-hover)]"
+            >
+              계약 연장
+            </button>
+            <button
+              type="button"
+              onClick={() => setCancelTarget(sole)}
+              className="rounded-md border border-rose-500/40 bg-rose-500/5 px-2 py-1 text-[11px] font-medium text-rose-600 transition hover:bg-rose-500/10"
+            >
+              계약 취소
+            </button>
+          </div>
+        ) : null}
+      </div>
       {tenantsLoading || contractsLoading ? (
         <div className="h-10 animate-pulse rounded-lg bg-[var(--control)]" />
       ) : linked.length === 0 ? (
@@ -275,6 +307,19 @@ function TenantsSection({ roomId }: { roomId: string }) {
           ))}
         </ul>
       )}
+
+      <ExtendAndPayDialog
+        contract={extendTarget?.contract ?? null}
+        tenantName={extendTarget?.tenant.name ?? ''}
+        roomNumber={roomNumber}
+        onClose={() => setExtendTarget(null)}
+      />
+      <CancelOccupancyDialog
+        contract={cancelTarget?.contract ?? null}
+        tenantName={cancelTarget?.tenant.name ?? ''}
+        roomNumber={roomNumber}
+        onClose={() => setCancelTarget(null)}
+      />
     </section>
   )
 }

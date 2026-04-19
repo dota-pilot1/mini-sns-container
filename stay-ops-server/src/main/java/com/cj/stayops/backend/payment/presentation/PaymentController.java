@@ -67,14 +67,16 @@ public class PaymentController {
 
 	@GetMapping
 	@Operation(summary = "결제 목록 조회",
-		description = "contractId / period(YYYY-MM) / status 필터 지원. paidAt 내림차순.")
+		description = "contractId / period(YYYY-MM) / fromPeriod / toPeriod / status 필터 지원. paidAt 내림차순.")
 	public ResponseEntity<List<PaymentResponse>> list(
 		@RequestParam(required = false) UUID contractId,
 		@RequestParam(required = false) String period,
+		@RequestParam(required = false) String fromPeriod,
+		@RequestParam(required = false) String toPeriod,
 		@RequestParam(required = false) PaymentStatus status
 	) {
 		List<PaymentResponse> items = listPaymentsUseCase
-			.execute(new ListPaymentsQuery(contractId, period, status))
+			.execute(new ListPaymentsQuery(contractId, period, fromPeriod, toPeriod, status))
 			.stream()
 			.map(PaymentResponse::from)
 			.toList();

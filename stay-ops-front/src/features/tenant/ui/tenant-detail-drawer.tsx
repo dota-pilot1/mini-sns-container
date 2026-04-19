@@ -2,15 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 
 import type { ContractResponse } from '@/features/contract/api/contract-api'
 import { useDeleteContract } from '@/features/contract/model/use-delete-contract'
-import { useTerminateContract } from '@/features/contract/model/use-terminate-contract'
 import { AddContractDialog } from '@/features/contract/ui/add-contract-dialog'
-import { ContractHistoryDialog } from '@/features/contract/ui/contract-history-dialog'
+import { CancelOccupancyDialog } from '@/features/contract/ui/cancel-occupancy-dialog'
+import { ExtendAndPayDialog } from '@/features/contract/ui/extend-and-pay-dialog'
 import type { PaymentResponse } from '@/features/payment/api/payment-api'
+import { useDeletePayment } from '@/features/payment/model/use-delete-payment'
 import { usePaymentsQuery } from '@/features/payment/model/use-payments'
-import {
-  RefundPaymentDialog,
-  type RefundTarget,
-} from '@/features/payment/ui/refund-payment-dialog'
 import {
   RegisterPaymentDialog,
   type RegisterPaymentTarget,
@@ -52,15 +49,14 @@ export function TenantDetailDrawer({
   const [terminateTarget, setTerminateTarget] = useState<ContractResponse | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [registerTarget, setRegisterTarget] = useState<RegisterPaymentTarget | null>(null)
-  const [refundTarget, setRefundTarget] = useState<RefundTarget | null>(null)
   const [deleteContractTarget, setDeleteContractTarget] = useState<ContractResponse | null>(null)
   const [addContractOpen, setAddContractOpen] = useState(false)
-  const [historyOpen, setHistoryOpen] = useState(false)
+  const [extendTarget, setExtendTarget] = useState<ContractResponse | null>(null)
 
-  const terminateMutation = useTerminateContract()
   const deleteMutation = useDeleteTenant()
   const updateMutation = useUpdateTenant()
   const deleteContractMutation = useDeleteContract()
+  const deletePaymentMutation = useDeletePayment()
 
   useEffect(() => {
     setMode('view')
@@ -141,10 +137,12 @@ export function TenantDetailDrawer({
               roomNumberById={roomNumberById}
               monthPayments={monthPayments}
               period={period}
-              onShowHistory={() => setHistoryOpen(true)}
               onTerminate={setTerminateTarget}
               onDeleteContract={setDeleteContractTarget}
               onAdd={() => setAddContractOpen(true)}
+              onExtend={() => {
+                if (activeContract) setExtendTarget(activeContract)
+              }}
               onRegisterPayment={(c) => {
                 const roomNumber = roomNumberById[c.roomId]
                 setRegisterTarget({
@@ -155,14 +153,15 @@ export function TenantDetailDrawer({
                   roomNumber,
                 })
               }}
-              onRefundPayment={(payment) =>
-                setRefundTarget({
-                  paymentId: payment.id,
-                  periodYearMonth: payment.periodYearMonth,
-                  amount: payment.amount,
-                  defaultNote: payment.note,
-                })
-              }
+              onUndoPayment={(payment) => {
+                if (
+                  window.confirm(
+                    `${payment.periodYearMonth} 결제 기록을 삭제할까요? (잘못 등록한 건 교정용)`,
+                  )
+                ) {
+                  deletePaymentMutation.mutate(payment.id)
+                }
+              }}
             />
             <Footer
               activeContract={activeContract}
@@ -191,23 +190,13 @@ export function TenantDetailDrawer({
         )}
       </aside>
 
-      <ConfirmDialog
-        open={terminateTarget !== null}
-        onClose={() =>
-          terminateMutation.isPending ? undefined : setTerminateTarget(null)
+      <CancelOccupancyDialog
+        contract={terminateTarget}
+        tenantName={tenant.name}
+        roomNumber={
+          terminateTarget ? roomNumberById[terminateTarget.roomId] : undefined
         }
-        onConfirm={() => {
-          if (!terminateTarget) return
-          terminateMutation.mutate(
-            { contractId: terminateTarget.contractId },
-            { onSuccess: () => setTerminateTarget(null) },
-          )
-        }}
-        title={`${tenant.name} 님을 퇴실 처리할까요?`}
-        description="계약 상태가 TERMINATED 로 변경되며 거주중 목록에서 제거됩니다. 언제든 새 계약을 만들어 재입주시킬 수 있습니다."
-        confirmLabel="퇴실"
-        variant="danger"
-        loading={terminateMutation.isPending}
+        onClose={() => setTerminateTarget(null)}
       />
 
       <ConfirmDialog
@@ -231,10 +220,6 @@ export function TenantDetailDrawer({
       <RegisterPaymentDialog
         target={registerTarget}
         onClose={() => setRegisterTarget(null)}
-      />
-      <RefundPaymentDialog
-        target={refundTarget}
-        onClose={() => setRefundTarget(null)}
       />
 
       <ConfirmDialog
@@ -266,12 +251,11 @@ export function TenantDetailDrawer({
         onClose={() => setAddContractOpen(false)}
       />
 
-      <ContractHistoryDialog
-        open={historyOpen}
+      <ExtendAndPayDialog
+        contract={extendTarget}
         tenantName={tenant.name}
-        contracts={tenantContracts}
-        roomNumberById={roomNumberById}
-        onClose={() => setHistoryOpen(false)}
+        roomNumber={extendTarget ? roomNumberById[extendTarget.roomId] : undefined}
+        onClose={() => setExtendTarget(null)}
       />
     </div>
   )
@@ -399,23 +383,23 @@ function ContractsSection({
   roomNumberById,
   monthPayments,
   period,
-  onShowHistory,
   onTerminate,
   onDeleteContract,
   onAdd,
+  onExtend,
   onRegisterPayment,
-  onRefundPayment,
+  onUndoPayment,
 }: {
   contracts: ContractResponse[]
   roomNumberById: Record<string, string>
   monthPayments: PaymentResponse[]
   period: string
-  onShowHistory: () => void
   onTerminate: (c: ContractResponse) => void
   onDeleteContract: (c: ContractResponse) => void
   onAdd: () => void
+  onExtend: () => void
   onRegisterPayment: (c: ContractResponse) => void
-  onRefundPayment: (p: PaymentResponse) => void
+  onUndoPayment: (p: PaymentResponse) => void
 }) {
   const hasActive = contracts.some((c) => c.status === 'ACTIVE')
   const latest = contracts[0] ?? null
@@ -424,21 +408,18 @@ function ContractsSection({
     <section className="flex flex-col gap-2 border-t border-[var(--border)] px-5 py-3">
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-          계약 이력 ({contracts.length})
+          계약
         </h3>
         <div className="flex items-center gap-1.5">
-          {contracts.length > 0 ? (
+          {hasActive ? (
             <button
               type="button"
-              onClick={onShowHistory}
-              aria-label="전체 계약 이력 보기"
-              title={`전체 ${contracts.length}건 보기`}
-              className="flex h-6 w-6 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--control)] text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--foreground)]"
+              onClick={onExtend}
+              className="rounded-md border border-[var(--border)] bg-[var(--control)] px-2 py-1 text-[11px] font-medium text-[var(--foreground)] transition hover:border-[var(--accent)] hover:bg-[var(--control-hover)]"
             >
-              <ListIcon />
+              계약 연장
             </button>
-          ) : null}
-          {!hasActive ? (
+          ) : (
             <button
               type="button"
               onClick={onAdd}
@@ -446,7 +427,7 @@ function ContractsSection({
             >
               + 새 계약
             </button>
-          ) : null}
+          )}
         </div>
       </div>
       {!latest ? (
@@ -498,7 +479,7 @@ function ContractsSection({
                         aria-checked={!!monthPaid}
                         onClick={() => {
                           if (monthPaid) {
-                            onRefundPayment(monthPaid)
+                            onUndoPayment(monthPaid)
                           } else {
                             onRegisterPayment(c)
                           }
@@ -525,7 +506,7 @@ function ContractsSection({
                       onClick={() => onTerminate(c)}
                       className="rounded-md border border-rose-500/40 bg-rose-500/5 px-2 py-1 text-[11px] font-medium text-rose-600 transition hover:bg-rose-500/10"
                     >
-                      퇴실
+                      계약 취소
                     </button>
                   ) : null}
                   <button
@@ -542,30 +523,6 @@ function ContractsSection({
         </ul>
       )}
     </section>
-  )
-}
-
-function ListIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="13"
-      height="13"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <line x1="8" y1="6" x2="21" y2="6" />
-      <line x1="8" y1="12" x2="21" y2="12" />
-      <line x1="8" y1="18" x2="21" y2="18" />
-      <line x1="3" y1="6" x2="3.01" y2="6" />
-      <line x1="3" y1="12" x2="3.01" y2="12" />
-      <line x1="3" y1="18" x2="3.01" y2="18" />
-    </svg>
   )
 }
 
@@ -609,7 +566,7 @@ function Footer({
           onClick={onTerminate}
           className="flex-1 rounded-lg border border-rose-500/40 bg-rose-500/5 px-3 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-500/10"
         >
-          퇴실
+          계약 취소
         </button>
       ) : (
         <button

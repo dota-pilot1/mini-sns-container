@@ -14,16 +14,22 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.cj.stayops.backend.contract.application.CancelOccupancyUseCase;
 import com.cj.stayops.backend.contract.application.CreateContractUseCase;
 import com.cj.stayops.backend.contract.application.DeleteContractUseCase;
+import com.cj.stayops.backend.contract.application.ExtendAndPayUseCase;
 import com.cj.stayops.backend.contract.application.GetContractUseCase;
 import com.cj.stayops.backend.contract.application.ListContractsUseCase;
 import com.cj.stayops.backend.contract.application.TerminateContractUseCase;
 import com.cj.stayops.backend.contract.application.dto.ContractResult;
 import com.cj.stayops.backend.contract.application.dto.ListContractsQuery;
 import com.cj.stayops.backend.contract.domain.model.ContractStatus;
+import com.cj.stayops.backend.contract.presentation.dto.CancelOccupancyRequest;
+import com.cj.stayops.backend.contract.presentation.dto.CancelOccupancyResponse;
 import com.cj.stayops.backend.contract.presentation.dto.ContractResponse;
 import com.cj.stayops.backend.contract.presentation.dto.CreateContractRequest;
+import com.cj.stayops.backend.contract.presentation.dto.ExtendAndPayRequest;
+import com.cj.stayops.backend.contract.presentation.dto.ExtendAndPayResponse;
 import com.cj.stayops.backend.contract.presentation.dto.TerminateContractRequest;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -40,17 +46,23 @@ public class ContractController {
 	private final GetContractUseCase getContractUseCase;
 	private final TerminateContractUseCase terminateContractUseCase;
 	private final DeleteContractUseCase deleteContractUseCase;
+	private final ExtendAndPayUseCase extendAndPayUseCase;
+	private final CancelOccupancyUseCase cancelOccupancyUseCase;
 
 	public ContractController(CreateContractUseCase createContractUseCase,
 							  ListContractsUseCase listContractsUseCase,
 							  GetContractUseCase getContractUseCase,
 							  TerminateContractUseCase terminateContractUseCase,
-							  DeleteContractUseCase deleteContractUseCase) {
+							  DeleteContractUseCase deleteContractUseCase,
+							  ExtendAndPayUseCase extendAndPayUseCase,
+							  CancelOccupancyUseCase cancelOccupancyUseCase) {
 		this.createContractUseCase = createContractUseCase;
 		this.listContractsUseCase = listContractsUseCase;
 		this.getContractUseCase = getContractUseCase;
 		this.terminateContractUseCase = terminateContractUseCase;
 		this.deleteContractUseCase = deleteContractUseCase;
+		this.extendAndPayUseCase = extendAndPayUseCase;
+		this.cancelOccupancyUseCase = cancelOccupancyUseCase;
 	}
 
 	@PostMapping
@@ -102,5 +114,33 @@ public class ContractController {
 			: request;
 		ContractResult result = terminateContractUseCase.execute(body.toCommand(contractId));
 		return ResponseEntity.ok(ContractResponse.from(result));
+	}
+
+	@PostMapping("/{contractId}/cancel-occupancy")
+	@Operation(summary = "퇴실 취소 (계약 종료 + 일괄 환불)",
+		description = "계약을 TERMINATED 로 바꾸고, 해당 계약의 모든 PAID 결제를 REFUNDED 로 전환합니다. "
+			+ "응답의 usedAmount / depositRefunded 는 안내용 권장값이며 실제 DB 금액 변경은 없습니다.")
+	public ResponseEntity<CancelOccupancyResponse> cancelOccupancy(
+		@PathVariable String contractId,
+		@Valid @RequestBody(required = false) CancelOccupancyRequest request
+	) {
+		CancelOccupancyRequest body = request == null
+			? new CancelOccupancyRequest(null, null)
+			: request;
+		return ResponseEntity.ok(
+			CancelOccupancyResponse.from(cancelOccupancyUseCase.execute(body.toCommand(contractId)))
+		);
+	}
+
+	@PostMapping("/{contractId}/extend-and-pay")
+	@Operation(summary = "계약 연장 + 결제",
+		description = "endDate 를 N 개월 연장하고, 연장된 각 월에 대해 PAID 결제 레코드를 생성합니다.")
+	public ResponseEntity<ExtendAndPayResponse> extendAndPay(
+		@PathVariable String contractId,
+		@Valid @RequestBody ExtendAndPayRequest request
+	) {
+		return ResponseEntity.ok(
+			ExtendAndPayResponse.from(extendAndPayUseCase.execute(request.toCommand(contractId)))
+		);
 	}
 }

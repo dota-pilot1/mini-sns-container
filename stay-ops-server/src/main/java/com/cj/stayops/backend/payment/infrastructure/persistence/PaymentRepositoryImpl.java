@@ -34,10 +34,14 @@ public class PaymentRepositoryImpl implements PaymentRepository {
 	}
 
 	@Override
-	public List<Payment> findAll(UUID contractId, PeriodYearMonth period, PaymentStatus status) {
+	public List<Payment> findAll(UUID contractId, PeriodYearMonth period,
+								 PeriodYearMonth fromPeriod, PeriodYearMonth toPeriod,
+								 PaymentStatus status) {
 		return jpaRepository.findAllByFilters(
 				contractId,
 				period == null ? null : period.asString(),
+				fromPeriod == null ? null : fromPeriod.asString(),
+				toPeriod == null ? null : toPeriod.asString(),
 				status == null ? null : status.name()
 			).stream()
 			.map(this::toDomain)

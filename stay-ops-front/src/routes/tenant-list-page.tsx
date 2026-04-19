@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from 'react'
 import type { TenantsSearch } from '@/app/router'
 import type { ContractResponse } from '@/features/contract/api/contract-api'
 import { useContractsQuery } from '@/features/contract/model/use-contracts'
-import { useTerminateContract } from '@/features/contract/model/use-terminate-contract'
+import { CancelOccupancyDialog } from '@/features/contract/ui/cancel-occupancy-dialog'
 import { useRoomsQuery } from '@/features/room/model/use-rooms'
 import type { TenantResponse } from '@/features/tenant/api/tenant-api'
 import { useDeleteTenant } from '@/features/tenant/model/use-delete-tenant'
@@ -59,7 +59,6 @@ export function TenantListPage() {
   const { data: tenants = [], isLoading: tenantsLoading } = useTenantsQuery()
   const { data: contracts = [], isLoading: contractsLoading } = useContractsQuery()
 
-  const terminateMutation = useTerminateContract()
   const hardDeleteMutation = useDeleteTenant()
 
   const allUsers = useMemo(() => userPage?.items ?? [], [userPage])
@@ -248,23 +247,11 @@ export function TenantListPage() {
         onClose={() => setSelected(null)}
       />
 
-      <ConfirmDialog
-        open={terminateTarget !== null}
-        onClose={() =>
-          terminateMutation.isPending ? undefined : setTerminateTarget(null)
-        }
-        onConfirm={() => {
-          if (!terminateTarget) return
-          terminateMutation.mutate(
-            { contractId: terminateTarget.contract.contractId },
-            { onSuccess: () => setTerminateTarget(null) },
-          )
-        }}
-        title={`${terminateTarget?.tenant.name ?? ''} 님을 퇴실 처리할까요?`}
-        description="계약이 TERMINATED 로 변경되며 퇴실 컬럼으로 이동합니다."
-        confirmLabel="퇴실"
-        variant="danger"
-        loading={terminateMutation.isPending}
+      <CancelOccupancyDialog
+        contract={terminateTarget?.contract ?? null}
+        tenantName={terminateTarget?.tenant.name ?? ''}
+        roomNumber={terminateTarget?.roomNumber ?? undefined}
+        onClose={() => setTerminateTarget(null)}
       />
 
       <ConfirmDialog
@@ -392,10 +379,10 @@ function ActiveTenantCard({
       <button
         type="button"
         onClick={onTerminate}
-        aria-label={`${tenant.name} 퇴실`}
+        aria-label={`${tenant.name} 계약 취소`}
         className="mr-2 shrink-0 rounded-lg border border-rose-500/40 bg-rose-500/5 px-2.5 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-500/10"
       >
-        퇴실
+        계약 취소
       </button>
     </div>
   )

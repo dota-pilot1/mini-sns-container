@@ -11,32 +11,29 @@ import com.cj.stayops.backend.contract.domain.model.Contract;
 import com.cj.stayops.backend.contract.domain.model.ContractId;
 import com.cj.stayops.backend.contract.domain.model.ContractStatus;
 import com.cj.stayops.backend.contract.domain.repository.ContractRepository;
-import com.cj.stayops.backend.payment.domain.repository.PaymentRepository;
 import com.cj.stayops.backend.room.domain.model.Room;
 import com.cj.stayops.backend.room.domain.model.RoomId;
 import com.cj.stayops.backend.room.domain.model.RoomStatus;
 import com.cj.stayops.backend.room.domain.repository.RoomRepository;
 
 /**
- * 계약 완전 삭제. 결제 레코드도 cascade 로 함께 hard-delete.
+ * 계약 소프트 삭제 — {@code deletedAt} 만 찍고 로우는 보존한다.
  * <p>
- * "잘못 입력한 계약 복구" 시나리오용. 정상 종료는 {@link TerminateContractUseCase} 사용.
- * 삭제로 인해 방의 다른 ACTIVE 계약이 사라지면 Room 상태도 VACANT 로 되돌린다.
+ * "잘못 입력한 계약 교정" 시나리오 전용. 정상 종료(퇴실)는 {@link TerminateContractUseCase}.
+ * 관련 결제 레코드는 그대로 두지만 조회 쿼리에서 계약 deletedAt 필터로 자동 제외된다.
+ * 삭제로 인해 방의 다른 ACTIVE 계약이 없으면 Room 상태도 VACANT 로 되돌린다.
  */
 @Service
 public class DeleteContractUseCase {
 
 	private final ContractRepository contractRepository;
-	private final PaymentRepository paymentRepository;
 	private final RoomRepository roomRepository;
 	private final Clock clock;
 
 	public DeleteContractUseCase(ContractRepository contractRepository,
-								 PaymentRepository paymentRepository,
 								 RoomRepository roomRepository,
 								 Clock clock) {
 		this.contractRepository = contractRepository;
-		this.paymentRepository = paymentRepository;
 		this.roomRepository = roomRepository;
 		this.clock = clock;
 	}
@@ -47,13 +44,13 @@ public class DeleteContractUseCase {
 		Contract contract = contractRepository.findById(id)
 			.orElseThrow(() -> new ContractNotFoundException(contractId));
 
-		paymentRepository.deleteByContractId(id.value());
-		contractRepository.deleteById(id);
+		Instant now = Instant.now(clock);
+		contractRepository.save(contract.softDelete(now));
 
-		releaseRoomIfNoOtherActive(contract.roomId(), id);
+		releaseRoomIfNoOtherActive(contract.roomId(), id, now);
 	}
 
-	private void releaseRoomIfNoOtherActive(java.util.UUID roomId, ContractId deletedId) {
+	private void releaseRoomIfNoOtherActive(java.util.UUID roomId, ContractId deletedId, Instant now) {
 		boolean hasOtherActive = contractRepository
 			.findAll(null, roomId, ContractStatus.ACTIVE).stream()
 			.anyMatch(c -> !c.id().equals(deletedId));
@@ -62,7 +59,7 @@ public class DeleteContractUseCase {
 		}
 		roomRepository.findById(RoomId.of(roomId)).ifPresent(room -> {
 			if (room.status() == RoomStatus.OCCUPIED) {
-				roomRepository.save(room.changeStatus(RoomStatus.VACANT, Instant.now(clock)));
+				roomRepository.save(room.changeStatus(RoomStatus.VACANT, now));
 			}
 		});
 	}

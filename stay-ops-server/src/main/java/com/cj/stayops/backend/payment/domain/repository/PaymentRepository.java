@@ -17,8 +17,11 @@ public interface PaymentRepository {
 
 	/**
 	 * 필터 조회 — 모두 nullable. paidAt 내림차순.
+	 * period 가 주어지면 정확한 월 매칭, fromPeriod/toPeriod 가 주어지면 범위 매칭.
 	 */
-	List<Payment> findAll(UUID contractId, PeriodYearMonth period, PaymentStatus status);
+	List<Payment> findAll(UUID contractId, PeriodYearMonth period,
+						  PeriodYearMonth fromPeriod, PeriodYearMonth toPeriod,
+						  PaymentStatus status);
 
 	/**
 	 * 한 계약의 한 달에 PAID 레코드가 이미 존재하는지.

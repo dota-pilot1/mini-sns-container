@@ -21,6 +21,4 @@ public interface ContractRepository {
 
 	/** 주어진 tenant 의 모든 계약을 DB 에서 제거 (tenant hard-delete 시 cascade). */
 	void deleteByTenantId(UUID tenantId);
-
-	void deleteById(ContractId id);
 }

@@ -1,19 +1,16 @@
 import { useMemo, useState } from 'react'
 
+import type { ContractResponse } from '@/features/contract/api/contract-api'
 import { useContractsQuery } from '@/features/contract/model/use-contracts'
-import type { OverduePaymentResponse, PaymentResponse } from '@/features/payment/api/payment-api'
+import { ExtendAndPayDialog } from '@/features/contract/ui/extend-and-pay-dialog'
+import type { PaymentResponse } from '@/features/payment/api/payment-api'
 import {
   PAYMENT_METHOD_LABEL,
   PAYMENT_STATUS_LABEL,
   type PaymentStatus,
 } from '@/features/payment/model/payment-types'
 import { useDeletePayment } from '@/features/payment/model/use-delete-payment'
-import { useOverduePaymentsQuery } from '@/features/payment/model/use-overdue-payments'
 import { usePaymentsQuery } from '@/features/payment/model/use-payments'
-import {
-  RefundPaymentDialog,
-  type RefundTarget,
-} from '@/features/payment/ui/refund-payment-dialog'
 import {
   RegisterPaymentDialog,
   type RegisterPaymentTarget,
@@ -24,35 +21,70 @@ import { ConfirmDialog } from '@/shared/ui/dialog'
 
 const numberFmt = new Intl.NumberFormat('ko-KR')
 
-type Tab = 'OVERDUE' | 'PAID' | 'REFUNDED' | 'ALL'
+type Tab = 'PAID' | 'REFUNDED' | 'ALL' | 'EXPIRING'
 
 const TAB_LABEL: Record<Tab, string> = {
-  OVERDUE: '미납',
   PAID: '완납',
   REFUNDED: '환불',
   ALL: '전체',
+  EXPIRING: '만료 임박',
 }
 
-function thisMonthString(): string {
+const EXPIRING_WINDOW_DAYS = 10
+
+function currentYear(): number {
+  return new Date().getFullYear()
+}
+
+function todayLocalISO(): string {
   const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
+  return d.toISOString().slice(0, 10)
+}
+
+function daysUntil(iso: string): number {
+  const target = new Date(iso)
+  const today = new Date()
+  target.setHours(0, 0, 0, 0)
+  today.setHours(0, 0, 0, 0)
+  return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+}
+
+function periodRange(year: number, month: number | null): { from: string; to: string } {
+  if (month == null) {
+    return {
+      from: `${year}-01`,
+      to: `${year}-12`,
+    }
+  }
+  const mm = String(month).padStart(2, '0')
+  return { from: `${year}-${mm}`, to: `${year}-${mm}` }
 }
 
 export function PaymentListPage() {
-  const [period, setPeriod] = useState<string>(thisMonthString())
-  const [tab, setTab] = useState<Tab>('OVERDUE')
+  const [year, setYear] = useState<number>(currentYear())
+  const [month, setMonth] = useState<number | null>(null)
+  const [tenantSearch, setTenantSearch] = useState<string>('')
+  const [roomSearch, setRoomSearch] = useState<string>('')
+  const [tab, setTab] = useState<Tab>('ALL')
   const [registerTarget, setRegisterTarget] = useState<RegisterPaymentTarget | null>(null)
-  const [refundTarget, setRefundTarget] = useState<RefundTarget | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<PaymentResponse | null>(null)
+  const [extendTarget, setExtendTarget] = useState<{
+    contract: ContractResponse
+    tenantName: string
+    roomNumber?: string
+  } | null>(null)
 
   const { data: tenants = [] } = useTenantsQuery()
   const { data: rooms = [] } = useRoomsQuery()
   const { data: contracts = [] } = useContractsQuery()
-  const { data: overdue = [], isLoading: overdueLoading } = useOverduePaymentsQuery(period)
+
+  const { from, to } = periodRange(year, month)
   const paidStatus: PaymentStatus | undefined =
     tab === 'PAID' ? 'PAID' : tab === 'REFUNDED' ? 'REFUNDED' : undefined
   const { data: payments = [], isLoading: paymentsLoading } = usePaymentsQuery({
-    period,
+    fromPeriod: from,
+    toPeriod: to,
     status: paidStatus,
   })
 
@@ -74,31 +106,57 @@ export function PaymentListPage() {
     return m
   }, [contracts])
 
-  const deleteMutation = useDeletePayment()
+  const expiringContracts = useMemo(() => {
+    const qName = tenantSearch.trim().toLowerCase()
+    const qRoom = roomSearch.trim().toLowerCase()
+    return contracts
+      .filter((c) => c.status === 'ACTIVE')
+      .map((c) => ({ contract: c, days: daysUntil(c.endDate) }))
+      .filter((x) => x.days <= EXPIRING_WINDOW_DAYS)
+      .filter((x) => {
+        if (qName) {
+          const name = (tenantNameById[x.contract.tenantId] ?? '').toLowerCase()
+          if (!name.includes(qName)) return false
+        }
+        if (qRoom) {
+          const room = (roomNumberById[x.contract.roomId] ?? '').toLowerCase()
+          if (!room.includes(qRoom)) return false
+        }
+        return true
+      })
+      .sort((a, b) => a.days - b.days)
+  }, [contracts, tenantSearch, roomSearch, tenantNameById, roomNumberById])
 
-  const openRegisterFor = (entry: OverduePaymentResponse) => {
-    setRegisterTarget({
-      contractId: entry.contractId,
-      periodYearMonth: period,
-      defaultAmount: entry.expectedAmount,
-      tenantName: entry.tenantName,
-      roomNumber: entry.roomNumber,
+  const filteredPayments = useMemo(() => {
+    const qName = tenantSearch.trim().toLowerCase()
+    const qRoom = roomSearch.trim().toLowerCase()
+    if (!qName && !qRoom) return payments
+    return payments.filter((p) => {
+      const c = contractById[p.contractId]
+      if (qName) {
+        const name = c ? (tenantNameById[c.tenantId] ?? '').toLowerCase() : ''
+        if (!name.includes(qName)) return false
+      }
+      if (qRoom) {
+        const room = c ? (roomNumberById[c.roomId] ?? '').toLowerCase() : ''
+        if (!room.includes(qRoom)) return false
+      }
+      return true
     })
-  }
+  }, [payments, tenantSearch, roomSearch, contractById, tenantNameById, roomNumberById])
+
+  const deleteMutation = useDeletePayment()
 
   const openRegisterForPaid = (p: PaymentResponse) => {
     const c = contractById[p.contractId]
     setRegisterTarget({
       contractId: p.contractId,
-      periodYearMonth: period,
+      periodYearMonth: p.periodYearMonth,
       defaultAmount: c?.monthlyRent ?? p.amount,
       tenantName: c ? tenantNameById[c.tenantId] : undefined,
       roomNumber: c ? roomNumberById[c.roomId] : undefined,
     })
   }
-
-  const visiblePayments = payments
-  const showRegisterFromPaidEmpty = tab === 'PAID' && visiblePayments.length === 0
 
   const confirmDelete = async () => {
     if (!deleteTarget) return
@@ -106,7 +164,7 @@ export function PaymentListPage() {
       await deleteMutation.mutateAsync(deleteTarget.id)
       setDeleteTarget(null)
     } catch {
-      // 에러는 mutation 의 isError 로 표시되어도 되지만 단순화: alert 없이 닫지 않음
+      // 에러는 mutation 의 isError 로 표시 — 닫지 않음
     }
   }
 
@@ -116,18 +174,99 @@ export function PaymentListPage() {
         <div>
           <h1 className="text-lg font-bold tracking-[-0.02em]">결제 관리</h1>
           <p className="text-xs text-[var(--muted)]">
-            관리자가 입금을 직접 확인 후 등록합니다. 토스/계좌 자동화는 추후 도입.
+            실제 발생한 결제(완납/환불)와 계약 만료 임박 건을 관리합니다.
           </p>
         </div>
-        <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
-          <span>기준월</span>
-          <input
-            type="month"
-            value={period}
-            onChange={(e) => setPeriod(e.target.value)}
-            className="rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-1.5 text-sm text-[var(--foreground)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring)]"
-          />
-        </label>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--muted)]">
+          <div className="inline-flex rounded-md border border-[var(--border)] bg-[var(--control)] p-0.5">
+            <button
+              type="button"
+              onClick={() => setYear((y) => y - 1)}
+              className="rounded px-2 py-1 text-[11px] font-medium text-[var(--foreground)] hover:bg-[var(--control-hover)]"
+            >
+              ← 전년
+            </button>
+            <button
+              type="button"
+              onClick={() => setYear(currentYear())}
+              disabled={year === currentYear()}
+              className="rounded px-2 py-1 text-[11px] font-medium text-[var(--foreground)] hover:bg-[var(--control-hover)] disabled:cursor-default disabled:bg-[var(--accent)] disabled:text-white"
+            >
+              올해
+            </button>
+            <button
+              type="button"
+              onClick={() => setYear((y) => y + 1)}
+              className="rounded px-2 py-1 text-[11px] font-medium text-[var(--foreground)] hover:bg-[var(--control-hover)]"
+            >
+              후년 →
+            </button>
+          </div>
+          <label className="flex items-center gap-2">
+            <span>연도</span>
+            <input
+              type="number"
+              value={year}
+              onChange={(e) => setYear(Number(e.target.value) || currentYear())}
+              className="w-20 rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] px-2 py-1.5 text-sm tabular-nums text-[var(--foreground)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring)]"
+            />
+          </label>
+          <label className="flex items-center gap-2">
+            <span>월</span>
+            <select
+              value={month ?? ''}
+              onChange={(e) => setMonth(e.target.value === '' ? null : Number(e.target.value))}
+              className="rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] px-2 py-1.5 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring)]"
+            >
+              <option value="">전체</option>
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                <option key={m} value={m}>
+                  {m}월
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2">
+            <span>입주자</span>
+            <input
+              type="text"
+              value={tenantSearch}
+              onChange={(e) => setTenantSearch(e.target.value)}
+              placeholder="이름 검색"
+              className="w-28 rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] px-2 py-1.5 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring)]"
+            />
+            {tenantSearch ? (
+              <button
+                type="button"
+                onClick={() => setTenantSearch('')}
+                title="초기화"
+                className="text-[11px] text-[var(--muted)] hover:text-[var(--foreground)]"
+              >
+                ✕
+              </button>
+            ) : null}
+          </label>
+          <label className="flex items-center gap-2">
+            <span>호수</span>
+            <input
+              type="text"
+              value={roomSearch}
+              onChange={(e) => setRoomSearch(e.target.value)}
+              placeholder="예: 702"
+              className="w-24 rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] px-2 py-1.5 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--ring)]"
+            />
+            {roomSearch ? (
+              <button
+                type="button"
+                onClick={() => setRoomSearch('')}
+                title="초기화"
+                className="text-[11px] text-[var(--muted)] hover:text-[var(--foreground)]"
+              >
+                ✕
+              </button>
+            ) : null}
+          </label>
+        </div>
       </header>
 
       <nav className="inline-flex w-fit rounded-md border border-[var(--border)] bg-[var(--control)] p-0.5">
@@ -144,40 +283,37 @@ export function PaymentListPage() {
             ].join(' ')}
           >
             {TAB_LABEL[t]}
-            {t === 'OVERDUE' && overdue.length > 0 ? (
-              <span className="ml-1.5 rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                {overdue.length}
+            {t === 'EXPIRING' && expiringContracts.length > 0 ? (
+              <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                {expiringContracts.length}
               </span>
             ) : null}
           </button>
         ))}
       </nav>
 
-      {tab === 'OVERDUE' ? (
-        <OverdueSection
-          loading={overdueLoading}
-          items={overdue}
-          period={period}
-          onRegister={openRegisterFor}
+      {tab === 'EXPIRING' ? (
+        <ExpiringSection
+          items={expiringContracts}
+          tenantNameById={tenantNameById}
+          roomNumberById={roomNumberById}
+          onExtend={(c) =>
+            setExtendTarget({
+              contract: c,
+              tenantName: tenantNameById[c.tenantId] ?? '입주자',
+              roomNumber: roomNumberById[c.roomId],
+            })
+          }
         />
       ) : (
         <PaymentsSection
           loading={paymentsLoading}
-          items={visiblePayments}
+          items={filteredPayments}
           tenantNameById={tenantNameById}
           roomNumberById={roomNumberById}
           contractById={contractById}
-          onRefund={(p) =>
-            setRefundTarget({
-              paymentId: p.id,
-              periodYearMonth: p.periodYearMonth,
-              amount: p.amount,
-              defaultNote: p.note,
-            })
-          }
           onDelete={(p) => setDeleteTarget(p)}
           onRegisterAgain={openRegisterForPaid}
-          showRegisterShortcut={showRegisterFromPaidEmpty}
         />
       )}
 
@@ -185,9 +321,11 @@ export function PaymentListPage() {
         target={registerTarget}
         onClose={() => setRegisterTarget(null)}
       />
-      <RefundPaymentDialog
-        target={refundTarget}
-        onClose={() => setRefundTarget(null)}
+      <ExtendAndPayDialog
+        contract={extendTarget?.contract ?? null}
+        tenantName={extendTarget?.tenantName ?? ''}
+        roomNumber={extendTarget?.roomNumber}
+        onClose={() => setExtendTarget(null)}
       />
       <ConfirmDialog
         open={deleteTarget !== null}
@@ -207,47 +345,68 @@ export function PaymentListPage() {
   )
 }
 
-function OverdueSection({
-  loading,
+function ExpiringSection({
   items,
-  period,
-  onRegister,
+  tenantNameById,
+  roomNumberById,
+  onExtend,
 }: {
-  loading: boolean
-  items: OverduePaymentResponse[]
-  period: string
-  onRegister: (entry: OverduePaymentResponse) => void
+  items: { contract: ContractResponse; days: number }[]
+  tenantNameById: Record<string, string>
+  roomNumberById: Record<string, string>
+  onExtend: (c: ContractResponse) => void
 }) {
-  if (loading) return <EmptyState text="불러오는 중…" />
   if (items.length === 0) {
-    return <EmptyState text={`${period} 미납자가 없습니다. 👍`} />
+    return <EmptyState text={`D-${EXPIRING_WINDOW_DAYS} 이내 만료되는 계약이 없습니다. 👍`} />
   }
   return (
     <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
-      {items.map((it) => (
-        <li
-          key={it.contractId}
-          className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
-        >
-          <div className="flex flex-col gap-0.5">
-            <div className="flex items-baseline gap-2">
-              <span className="text-sm font-semibold">{it.tenantName}</span>
-              <span className="text-xs text-[var(--muted)]">{it.roomNumber}호</span>
-            </div>
-            <span className="text-xs text-[var(--muted)]">
-              {numberFmt.format(it.expectedAmount)}원
-              {it.daysOverdue > 0 ? ` · ${it.daysOverdue}일 연체` : ' · 이번 달'}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => onRegister(it)}
-            className="shrink-0 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90"
+      {items.map(({ contract, days }) => {
+        const tenantName = tenantNameById[contract.tenantId] ?? '—'
+        const roomNumber = roomNumberById[contract.roomId] ?? contract.roomId.slice(0, 6)
+        const overdue = days < 0
+        const badgeLabel = overdue
+          ? `${-days}일 초과`
+          : days === 0
+            ? '오늘 만료'
+            : `D-${days}`
+        const badgeTone = overdue
+          ? 'bg-rose-500 text-white'
+          : days <= 3
+            ? 'bg-rose-500/15 text-rose-600'
+            : 'bg-amber-500/15 text-amber-600'
+        return (
+          <li
+            key={contract.contractId}
+            className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
           >
-            입금 확인
-          </button>
-        </li>
-      ))}
+            <div className="flex flex-col gap-0.5">
+              <div className="flex items-baseline gap-2">
+                <span className="text-sm font-semibold">{tenantName}</span>
+                <span className="text-xs text-[var(--muted)]">{roomNumber}호</span>
+                <span
+                  className={[
+                    'ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
+                    badgeTone,
+                  ].join(' ')}
+                >
+                  {badgeLabel}
+                </span>
+              </div>
+              <span className="text-xs text-[var(--muted)] tabular-nums">
+                ~ {contract.endDate} · 월 {numberFmt.format(contract.monthlyRent)}원
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => onExtend(contract)}
+              className="shrink-0 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90"
+            >
+              계약 연장
+            </button>
+          </li>
+        )
+      })}
     </ul>
   )
 }
@@ -258,32 +417,20 @@ function PaymentsSection({
   tenantNameById,
   roomNumberById,
   contractById,
-  onRefund,
   onDelete,
   onRegisterAgain,
-  showRegisterShortcut,
 }: {
   loading: boolean
   items: PaymentResponse[]
   tenantNameById: Record<string, string>
   roomNumberById: Record<string, string>
   contractById: Record<string, { tenantId: string; roomId: string }>
-  onRefund: (p: PaymentResponse) => void
   onDelete: (p: PaymentResponse) => void
   onRegisterAgain: (p: PaymentResponse) => void
-  showRegisterShortcut: boolean
 }) {
   if (loading) return <EmptyState text="불러오는 중…" />
   if (items.length === 0) {
-    return (
-      <EmptyState
-        text={
-          showRegisterShortcut
-            ? '이번 달 등록된 결제가 없습니다. 미납 탭에서 입금을 등록하세요.'
-            : '표시할 결제 내역이 없습니다.'
-        }
-      />
-    )
+    return <EmptyState text="표시할 결제 내역이 없습니다." />
   }
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
@@ -343,15 +490,7 @@ function PaymentsSection({
                 <td className="px-3 py-2 tabular-nums">{p.paidAt.slice(0, 10)}</td>
                 <td className="px-3 py-2 text-right">
                   <div className="flex justify-end gap-1.5">
-                    {!refunded ? (
-                      <button
-                        type="button"
-                        onClick={() => onRefund(p)}
-                        className="rounded-md border border-[var(--border)] bg-[var(--control)] px-2 py-1 text-[11px] font-medium hover:bg-[var(--control-hover)]"
-                      >
-                        환불
-                      </button>
-                    ) : (
+                    {refunded ? (
                       <button
                         type="button"
                         onClick={() => onRegisterAgain(p)}
@@ -359,7 +498,7 @@ function PaymentsSection({
                       >
                         재등록
                       </button>
-                    )}
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => onDelete(p)}

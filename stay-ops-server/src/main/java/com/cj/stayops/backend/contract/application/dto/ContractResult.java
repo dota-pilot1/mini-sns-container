@@ -15,6 +15,7 @@ public record ContractResult(
 	long monthlyRent,
 	long deposit,
 	ContractStatus status,
+	String previousContractId,
 	Instant createdAt,
 	Instant updatedAt
 ) {
@@ -28,6 +29,7 @@ public record ContractResult(
 			c.monthlyRent(),
 			c.deposit(),
 			c.status(),
+			c.previousContractId() == null ? null : c.previousContractId().asString(),
 			c.createdAt(),
 			c.updatedAt()
 		);

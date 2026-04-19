@@ -13,14 +13,22 @@ public interface PaymentJpaRepository extends JpaRepository<PaymentJpaEntity, UU
 
 	@Query("""
 		SELECT p FROM PaymentJpaEntity p
-		WHERE (:contractId IS NULL OR p.contractId = :contractId)
+		WHERE EXISTS (
+			SELECT 1 FROM com.cj.stayops.backend.contract.infrastructure.persistence.ContractJpaEntity c
+			WHERE c.id = p.contractId AND c.deletedAt IS NULL
+		)
+		  AND (:contractId IS NULL OR p.contractId = :contractId)
 		  AND (:period IS NULL OR p.periodYearMonth = :period)
+		  AND (:fromPeriod IS NULL OR p.periodYearMonth >= :fromPeriod)
+		  AND (:toPeriod IS NULL OR p.periodYearMonth <= :toPeriod)
 		  AND (:status IS NULL OR p.status = :status)
 		ORDER BY p.paidAt DESC
 		""")
 	List<PaymentJpaEntity> findAllByFilters(
 		@Param("contractId") UUID contractId,
 		@Param("period") String period,
+		@Param("fromPeriod") String fromPeriod,
+		@Param("toPeriod") String toPeriod,
 		@Param("status") String status
 	);
 
@@ -35,7 +43,11 @@ public interface PaymentJpaRepository extends JpaRepository<PaymentJpaEntity, UU
 
 	@Query("""
 		SELECT DISTINCT p.contractId FROM PaymentJpaEntity p
-		WHERE p.contractId IN :contractIds
+		WHERE EXISTS (
+			SELECT 1 FROM com.cj.stayops.backend.contract.infrastructure.persistence.ContractJpaEntity c
+			WHERE c.id = p.contractId AND c.deletedAt IS NULL
+		)
+		  AND p.contractId IN :contractIds
 		  AND p.periodYearMonth = :period
 		  AND p.status = 'PAID'
 		""")

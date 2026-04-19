@@ -166,10 +166,14 @@ class RegisterManualPaymentUseCaseTest {
 		}
 
 		@Override
-		public List<Payment> findAll(UUID contractId, PeriodYearMonth period, PaymentStatus status) {
+		public List<Payment> findAll(UUID contractId, PeriodYearMonth period,
+									 PeriodYearMonth fromPeriod, PeriodYearMonth toPeriod,
+									 PaymentStatus status) {
 			return byId.values().stream()
 				.filter(p -> contractId == null || p.contractId().equals(contractId))
 				.filter(p -> period == null || p.periodYearMonth().equals(period))
+				.filter(p -> fromPeriod == null || p.periodYearMonth().asString().compareTo(fromPeriod.asString()) >= 0)
+				.filter(p -> toPeriod == null || p.periodYearMonth().asString().compareTo(toPeriod.asString()) <= 0)
 				.filter(p -> status == null || p.status() == status)
 				.sorted((a, b) -> b.paidAt().compareTo(a.paidAt()))
 				.toList();
@@ -228,11 +232,6 @@ class RegisterManualPaymentUseCaseTest {
 		@Override
 		public void deleteByTenantId(UUID tenantId) {
 			byId.entrySet().removeIf(e -> e.getValue().tenantId().equals(tenantId));
-		}
-
-		@Override
-		public void deleteById(ContractId id) {
-			byId.remove(id);
 		}
 	}
 }

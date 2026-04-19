@@ -28,7 +28,7 @@ public class ContractRepositoryImpl implements ContractRepository {
 
 	@Override
 	public Optional<Contract> findById(ContractId id) {
-		return jpaRepository.findById(id.value()).map(this::toDomain);
+		return jpaRepository.findByIdActive(id.value()).map(this::toDomain);
 	}
 
 	@Override
@@ -46,11 +46,6 @@ public class ContractRepositoryImpl implements ContractRepository {
 		jpaRepository.deleteByTenantId(tenantId);
 	}
 
-	@Override
-	public void deleteById(ContractId id) {
-		jpaRepository.deleteById(id.value());
-	}
-
 	private ContractJpaEntity toEntity(Contract c) {
 		return new ContractJpaEntity(
 			c.id().value(),
@@ -61,6 +56,8 @@ public class ContractRepositoryImpl implements ContractRepository {
 			c.monthlyRent(),
 			c.deposit(),
 			c.status().name(),
+			c.previousContractId() == null ? null : c.previousContractId().value(),
+			c.deletedAt(),
 			c.createdAt(),
 			c.updatedAt()
 		);
@@ -76,6 +73,8 @@ public class ContractRepositoryImpl implements ContractRepository {
 			e.getMonthlyRent(),
 			e.getDeposit(),
 			ContractStatus.valueOf(e.getStatus()),
+			e.getPreviousContractId() == null ? null : ContractId.of(e.getPreviousContractId()),
+			e.getDeletedAt(),
 			e.getCreatedAt(),
 			e.getUpdatedAt()
 		);

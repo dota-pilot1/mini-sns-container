@@ -24,7 +24,13 @@ public class ListPaymentsUseCase {
 		PeriodYearMonth period = query.periodYearMonth() == null
 			? null
 			: PeriodYearMonth.of(query.periodYearMonth());
-		return paymentRepository.findAll(query.contractId(), period, query.status()).stream()
+		PeriodYearMonth fromPeriod = query.fromPeriod() == null
+			? null
+			: PeriodYearMonth.of(query.fromPeriod());
+		PeriodYearMonth toPeriod = query.toPeriod() == null
+			? null
+			: PeriodYearMonth.of(query.toPeriod());
+		return paymentRepository.findAll(query.contractId(), period, fromPeriod, toPeriod, query.status()).stream()
 			.map(PaymentResult::from)
 			.toList();
 	}

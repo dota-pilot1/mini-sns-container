@@ -11,6 +11,7 @@ export type ContractResponse = {
   monthlyRent: number
   deposit: number
   status: ContractStatus
+  previousContractId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -22,6 +23,32 @@ export type CreateContractPayload = {
   endDate: string
   monthlyRent: number
   deposit: number
+}
+
+export type ExtendAndPayPayload = {
+  months: number
+  amountPerMonth?: number
+  method?: 'CARD' | 'CASH' | 'BANK_TRANSFER'
+  note?: string
+}
+
+export type ExtendAndPayResponse = {
+  contract: ContractResponse
+  paymentIds: string[]
+  totalAmount: number
+}
+
+export type CancelOccupancyPayload = {
+  moveOutDate?: string
+  refundDeposit?: boolean
+}
+
+export type CancelOccupancyResponse = {
+  contract: ContractResponse
+  refundedPaymentIds: string[]
+  refundedTotal: number
+  usedAmount: number
+  depositRefunded: number
 }
 
 export type ListContractsParams = {
@@ -56,6 +83,24 @@ export const contractApi = {
     return apiFetch<ContractResponse>(`/api/contracts/${contractId}/terminate`, {
       method: 'POST',
       body: JSON.stringify({ terminationDate: terminationDate ?? null }),
+    })
+  },
+  extendAndPay(contractId: string, body: ExtendAndPayPayload): Promise<ExtendAndPayResponse> {
+    return apiFetch<ExtendAndPayResponse>(`/api/contracts/${contractId}/extend-and-pay`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+  },
+  cancelOccupancy(
+    contractId: string,
+    body: CancelOccupancyPayload = {},
+  ): Promise<CancelOccupancyResponse> {
+    return apiFetch<CancelOccupancyResponse>(`/api/contracts/${contractId}/cancel-occupancy`, {
+      method: 'POST',
+      body: JSON.stringify({
+        moveOutDate: body.moveOutDate ?? null,
+        refundDeposit: body.refundDeposit ?? false,
+      }),
     })
   },
   remove(contractId: string): Promise<void> {
