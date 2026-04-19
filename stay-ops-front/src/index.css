@@ -123,10 +123,12 @@ a {
   text-decoration: none;
 }
 
-button,
-input,
-select {
-  font: inherit;
+@layer base {
+  button,
+  input,
+  select {
+    font: inherit;
+  }
 }
 
 #root {

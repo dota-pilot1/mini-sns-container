@@ -28,7 +28,7 @@ export function AppShell({ children }: PropsWithChildren) {
   return (
     <div className="flex min-h-svh w-full flex-col bg-[var(--background)]">
       <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur">
-        <div className="flex h-14 items-center gap-4 px-4 md:px-6">
+        <div className="flex h-12 items-center gap-4 px-4 md:px-6">
           {/* Left: compact title */}
           <Link
             to={user ? '/' : '/login'}
@@ -39,7 +39,7 @@ export function AppShell({ children }: PropsWithChildren) {
 
           {/* Center: main nav (only when logged in) */}
           {user ? (
-            <nav className="mx-auto inline-flex rounded-full border border-[var(--border)] bg-[var(--control)] p-1">
+            <nav className="mx-auto inline-flex rounded-md border border-[var(--border)] bg-[var(--control)] p-0.5">
               <NavLink active={pathname === '/'} to="/">
                 대시보드
               </NavLink>
@@ -68,7 +68,7 @@ export function AppShell({ children }: PropsWithChildren) {
 
           {/* Right: utilities */}
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--control)] p-1">
+            <div className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--control)] px-1 py-0.5">
               <LanguageSelect />
               <ThemeToggle />
             </div>
@@ -122,7 +122,7 @@ function UserMenu({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--accent)] text-xs font-bold text-white shadow-sm transition hover:opacity-90"
+        className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent)] text-[11px] font-bold text-white shadow-sm transition hover:opacity-90"
         aria-label={name}
       >
         {initials}
@@ -183,7 +183,7 @@ function NavLink({ active, children, to }: NavLinkProps) {
     <Link
       to={to}
       className={[
-        'inline-flex min-w-24 items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium tracking-[-0.01em] transition',
+        'inline-flex min-w-20 items-center justify-center rounded px-3 py-1 text-[13px] font-medium tracking-[-0.01em] transition',
         active
           ? 'bg-[var(--accent)] text-white shadow-sm'
           : 'text-[var(--muted)] hover:bg-[var(--control-hover)] hover:text-[var(--foreground)]',

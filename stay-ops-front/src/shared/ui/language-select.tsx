@@ -11,10 +11,10 @@ export function LanguageSelect() {
   const { i18n } = useTranslation()
 
   return (
-    <label className="relative">
+    <label className="relative inline-flex">
       <select
         aria-label="Language"
-        className="min-w-22 appearance-none rounded-full bg-transparent py-2 pl-4 pr-9 text-sm font-semibold tracking-[0.04em] text-[var(--foreground)] outline-none transition focus:ring-4 focus:ring-[var(--ring)]"
+        className="h-7 appearance-none rounded bg-transparent py-0 pl-2 pr-5 text-xs font-semibold leading-none tracking-wider text-[var(--foreground)] outline-none transition hover:bg-[var(--control-hover)] focus:ring-2 focus:ring-[var(--ring)]"
         onChange={(event) => {
           void i18n.changeLanguage(event.target.value)
         }}
@@ -26,9 +26,18 @@ export function LanguageSelect() {
           </option>
         ))}
       </select>
-      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)]">
-        ▼
-      </span>
+      <svg
+        aria-hidden="true"
+        className="pointer-events-none absolute right-1 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--muted)]"
+        viewBox="0 0 12 12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M3 4.5 L6 7.5 L9 4.5" />
+      </svg>
     </label>
   )
 }
