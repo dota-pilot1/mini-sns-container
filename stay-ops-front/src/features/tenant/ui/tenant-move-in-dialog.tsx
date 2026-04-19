@@ -417,76 +417,80 @@ function SelectedRoomDetail({ room }: { room?: RoomResponse }) {
   const previewImages = orderedImages.slice(0, 3)
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--control)] px-3 py-3 text-xs">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-sm font-semibold text-[var(--foreground)]">
-          {room.roomNumber}호
-        </span>
-        <span className="text-[var(--muted)]">
-          {room.floor}F · {Number(room.sizePyeong)}평
-        </span>
+    <div className="flex flex-col gap-2 text-xs">
+      <div className="flex flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--control)] px-3 py-3">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-sm font-semibold text-[var(--foreground)]">
+            {room.roomNumber}호
+          </span>
+          <span className="text-[var(--muted)]">
+            {room.floor}F · {Number(room.sizePyeong)}평
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[var(--muted)]">
+          <span>월세</span>
+          <span className="text-right tabular-nums text-[var(--foreground)]">
+            {numberFmt.format(room.monthlyRent)}원
+          </span>
+          <span>보증금</span>
+          <span className="text-right tabular-nums text-[var(--foreground)]">
+            {numberFmt.format(room.deposit)}원
+          </span>
+        </div>
+        {room.options.length > 0 ? (
+          <div className="flex flex-wrap gap-1 pt-1">
+            {room.options.map((opt) => (
+              <span
+                key={opt}
+                className="rounded-md bg-[var(--surface-strong)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--muted)]"
+              >
+                {ROOM_OPTION_LABEL[opt]}
+              </span>
+            ))}
+          </div>
+        ) : null}
+        {room.memo ? (
+          <p className="border-t border-[var(--border)] pt-1.5 text-[11px] text-[var(--muted)]">
+            {room.memo}
+          </p>
+        ) : null}
       </div>
 
       {previewImages.length > 0 ? (
-        <div className="grid grid-cols-2 gap-1.5">
-          {previewImages.map((img, idx) => (
-            <button
-              key={img.id}
-              type="button"
-              onClick={() => setLightboxIndex(idx)}
-              className={[
-                'group relative overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-strong)]',
-                idx === 0 && previewImages.length > 1 ? 'col-span-2 aspect-[16/9]' : 'aspect-square',
-              ].join(' ')}
-              aria-label={`이미지 ${idx + 1} 크게 보기`}
-            >
-              <img
-                src={img.url}
-                alt={`${room.roomNumber}호 이미지 ${idx + 1}`}
-                loading="lazy"
-                className="h-full w-full object-cover transition group-hover:scale-[1.02]"
-              />
-              {img.primary ? (
-                <span className="absolute left-1 top-1 rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[9px] font-semibold text-white shadow">
-                  대표
-                </span>
-              ) : null}
-              {idx === previewImages.length - 1 && orderedImages.length > previewImages.length ? (
-                <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-[11px] font-medium text-white">
-                  +{orderedImages.length - previewImages.length}장 더보기
-                </span>
-              ) : null}
-            </button>
-          ))}
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--control)] p-2">
+          <div className="grid grid-cols-2 gap-1.5">
+            {previewImages.map((img, idx) => (
+              <button
+                key={img.id}
+                type="button"
+                onClick={() => setLightboxIndex(idx)}
+                className={[
+                  'group relative overflow-hidden rounded-md border border-[var(--border)] bg-[var(--surface-strong)]',
+                  idx === 0 && previewImages.length > 1 ? 'col-span-2 aspect-[16/9]' : 'aspect-square',
+                ].join(' ')}
+                aria-label={`이미지 ${idx + 1} 크게 보기`}
+              >
+                <img
+                  src={img.url}
+                  alt={`${room.roomNumber}호 이미지 ${idx + 1}`}
+                  loading="lazy"
+                  className="h-full w-full object-cover transition group-hover:scale-[1.02]"
+                />
+                {img.primary ? (
+                  <span className="absolute left-1 top-1 rounded-full bg-[var(--accent)] px-1.5 py-0.5 text-[9px] font-semibold text-white shadow">
+                    대표
+                  </span>
+                ) : null}
+                {idx === previewImages.length - 1 && orderedImages.length > previewImages.length ? (
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-[11px] font-medium text-white">
+                    +{orderedImages.length - previewImages.length}장 더보기
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
         </div>
-      ) : null}
-
-      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[var(--muted)]">
-        <span>월세</span>
-        <span className="text-right tabular-nums text-[var(--foreground)]">
-          {numberFmt.format(room.monthlyRent)}원
-        </span>
-        <span>보증금</span>
-        <span className="text-right tabular-nums text-[var(--foreground)]">
-          {numberFmt.format(room.deposit)}원
-        </span>
-      </div>
-      {room.options.length > 0 ? (
-        <div className="flex flex-wrap gap-1 pt-1">
-          {room.options.map((opt) => (
-            <span
-              key={opt}
-              className="rounded-md bg-[var(--surface-strong)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--muted)]"
-            >
-              {ROOM_OPTION_LABEL[opt]}
-            </span>
-          ))}
-        </div>
-      ) : null}
-      {room.memo ? (
-        <p className="border-t border-[var(--border)] pt-1.5 text-[11px] text-[var(--muted)]">
-          {room.memo}
-        </p>
       ) : null}
 
       {lightboxIndex !== null ? (
