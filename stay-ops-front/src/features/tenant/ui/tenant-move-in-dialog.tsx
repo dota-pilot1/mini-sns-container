@@ -5,6 +5,7 @@ import { z } from 'zod'
 
 import { useCreateContract } from '@/features/contract/model/use-create-contract'
 import type { RoomResponse } from '@/features/room/api/room-api'
+import { ROOM_OPTION_LABEL } from '@/features/room/model/room-types'
 import { useCreateTenant } from '@/features/tenant/model/use-create-tenant'
 import { useTenantsQuery } from '@/features/tenant/model/use-tenants'
 import type { UserResponse } from '@/features/user/api/user-api'
@@ -218,7 +219,7 @@ export function TenantMoveInDialog({
       open={open}
       onClose={() => (submitting ? undefined : onClose())}
       ariaLabel="입주 처리"
-      maxWidth="max-w-4xl"
+      maxWidth="max-w-[1400px]"
       closeOnBackdrop={false}
     >
       <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
@@ -241,9 +242,12 @@ export function TenantMoveInDialog({
         </button>
       </div>
 
-      <form onSubmit={submit} className="grid grid-cols-1 gap-0 md:grid-cols-[minmax(0,340px)_1fr]">
+      <form
+        onSubmit={submit}
+        className="grid grid-cols-1 gap-0 md:grid-cols-[minmax(0,340px)_1fr] xl:grid-cols-[minmax(0,340px)_1fr_minmax(0,320px)]"
+      >
         {/* 왼쪽: 입력 필드 */}
-        <div className="flex flex-col gap-4 border-b border-[var(--border)] px-5 py-4 md:border-b-0 md:border-r">
+        <div className="flex flex-col gap-4 border-b border-[var(--border)] px-6 py-5 md:border-b-0 md:border-r">
           <Field label="연락처" error={errors.phoneNumber?.message}>
             <div className="flex gap-2">
               <input
@@ -313,18 +317,16 @@ export function TenantMoveInDialog({
             />
           </Field>
 
-          <div className="mt-auto rounded-lg border border-[var(--border)] bg-[var(--control)] px-3 py-2 text-xs">
-            <span className="font-medium text-[var(--foreground)]">배정된 방 </span>
-            <span className="text-[var(--muted)]">
-              {selectedRoomId
-                ? `${rooms.find((r) => r.roomId === selectedRoomId)?.roomNumber ?? ''}호`
-                : '미선택'}
-            </span>
+          {/* xl 이하 (3컬럼 미적용) 에서는 좌측 하단에 방 상세 표시 */}
+          <div className="mt-auto xl:hidden">
+            <SelectedRoomDetail
+              room={selectedRoomId ? rooms.find((r) => r.roomId === selectedRoomId) : undefined}
+            />
           </div>
         </div>
 
-        {/* 오른쪽: 방 그리드 */}
-        <div className="flex flex-col gap-3 px-5 py-4">
+        {/* 가운데: 방 그리드 */}
+        <div className="flex flex-col gap-3 px-6 py-5">
           <div className="flex items-baseline justify-between">
             <h3 className="text-sm font-semibold">방 선택</h3>
             <span className="text-xs text-[var(--muted)]">
@@ -332,7 +334,7 @@ export function TenantMoveInDialog({
             </span>
           </div>
 
-          <div className="flex flex-col gap-4 max-h-[420px] overflow-y-auto pr-1">
+          <div className="flex flex-col gap-4 max-h-[60vh] overflow-y-auto pr-1">
             {roomsByFloor.map(([floor, floorRooms]) => (
               <div key={floor} className="flex flex-col gap-2">
                 <h4 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
@@ -356,6 +358,14 @@ export function TenantMoveInDialog({
               </div>
             ))}
           </div>
+        </div>
+
+        {/* 오른쪽: 방 상세 (xl 이상에서만 노출) */}
+        <div className="hidden xl:flex flex-col gap-3 border-l border-[var(--border)] px-6 py-5">
+          <h3 className="text-sm font-semibold">방 상세</h3>
+          <SelectedRoomDetail
+            room={selectedRoomId ? rooms.find((r) => r.roomId === selectedRoomId) : undefined}
+          />
         </div>
 
         {/* footer 전체 span */}
@@ -383,6 +393,58 @@ export function TenantMoveInDialog({
         </div>
       </form>
     </Dialog>
+  )
+}
+
+/* ───── selected room detail summary ───── */
+
+function SelectedRoomDetail({ room }: { room?: RoomResponse }) {
+  if (!room) {
+    return (
+      <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--control)] px-3 py-6 text-center text-xs text-[var(--muted)]">
+        방을 선택하면 상세 정보가 여기에 표시됩니다
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--control)] px-3 py-3 text-xs">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-sm font-semibold text-[var(--foreground)]">
+          {room.roomNumber}호
+        </span>
+        <span className="text-[var(--muted)]">
+          {room.floor}F · {Number(room.sizePyeong)}평
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[var(--muted)]">
+        <span>월세</span>
+        <span className="text-right tabular-nums text-[var(--foreground)]">
+          {numberFmt.format(room.monthlyRent)}원
+        </span>
+        <span>보증금</span>
+        <span className="text-right tabular-nums text-[var(--foreground)]">
+          {numberFmt.format(room.deposit)}원
+        </span>
+      </div>
+      {room.options.length > 0 ? (
+        <div className="flex flex-wrap gap-1 pt-1">
+          {room.options.map((opt) => (
+            <span
+              key={opt}
+              className="rounded-md bg-[var(--surface-strong)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--muted)]"
+            >
+              {ROOM_OPTION_LABEL[opt]}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {room.memo ? (
+        <p className="border-t border-[var(--border)] pt-1.5 text-[11px] text-[var(--muted)]">
+          {room.memo}
+        </p>
+      ) : null}
+    </div>
   )
 }
 
