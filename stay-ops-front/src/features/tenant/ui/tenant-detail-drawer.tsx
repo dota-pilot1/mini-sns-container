@@ -1,13 +1,30 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import type { ContractResponse } from '@/features/contract/api/contract-api'
+import { useDeleteContract } from '@/features/contract/model/use-delete-contract'
 import { useTerminateContract } from '@/features/contract/model/use-terminate-contract'
-import { RecentPaymentsSection } from '@/features/payment/ui/recent-payments-section'
+import { AddContractDialog } from '@/features/contract/ui/add-contract-dialog'
+import type { PaymentResponse } from '@/features/payment/api/payment-api'
+import { usePaymentsQuery } from '@/features/payment/model/use-payments'
+import {
+  RefundPaymentDialog,
+  type RefundTarget,
+} from '@/features/payment/ui/refund-payment-dialog'
+import {
+  RegisterPaymentDialog,
+  type RegisterPaymentTarget,
+} from '@/features/payment/ui/register-payment-dialog'
+import { TenantPaymentsHistorySection } from '@/features/payment/ui/tenant-payments-history-section'
 import type { TenantResponse } from '@/features/tenant/api/tenant-api'
 import { useDeleteTenant } from '@/features/tenant/model/use-delete-tenant'
 import { useUpdateTenant } from '@/features/tenant/model/use-update-tenant'
 import { TenantForm } from '@/features/tenant/ui/tenant-form'
 import { ConfirmDialog } from '@/shared/ui/dialog'
+
+function thisMonthString(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
 
 const dateFmt = new Intl.DateTimeFormat('ko-KR', {
   dateStyle: 'medium',
@@ -34,10 +51,15 @@ export function TenantDetailDrawer({
   const [mode, setMode] = useState<Mode>('view')
   const [terminateTarget, setTerminateTarget] = useState<ContractResponse | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [registerTarget, setRegisterTarget] = useState<RegisterPaymentTarget | null>(null)
+  const [refundTarget, setRefundTarget] = useState<RefundTarget | null>(null)
+  const [deleteContractTarget, setDeleteContractTarget] = useState<ContractResponse | null>(null)
+  const [addContractOpen, setAddContractOpen] = useState(false)
 
   const terminateMutation = useTerminateContract()
   const deleteMutation = useDeleteTenant()
   const updateMutation = useUpdateTenant()
+  const deleteContractMutation = useDeleteContract()
 
   useEffect(() => {
     setMode('view')
@@ -61,6 +83,24 @@ export function TenantDetailDrawer({
 
   const activeContract = tenantContracts.find((c) => c.status === 'ACTIVE') ?? null
 
+  const period = thisMonthString()
+  const { data: monthPayments = [] } = usePaymentsQuery(
+    activeContract ? { contractId: activeContract.contractId, period } : {},
+    { enabled: !!activeContract },
+  )
+  const thisMonthPaid = activeContract
+    ? monthPayments.find((p) => p.status === 'PAID') ?? null
+    : null
+  const thisMonthRefunded = activeContract
+    ? monthPayments.some((p) => p.status === 'REFUNDED' && !thisMonthPaid)
+    : false
+
+  const occupiedRoomIds = useMemo(() => {
+    const set = new Set<string>()
+    for (const c of contracts) if (c.status === 'ACTIVE') set.add(c.roomId)
+    return set
+  }, [contracts])
+
   return (
     <div className="fixed inset-0 z-40">
       <button
@@ -80,16 +120,44 @@ export function TenantDetailDrawer({
 
         {mode === 'view' ? (
           <>
-            <InfoSection tenant={tenant} />
-            {activeContract ? (
-              <div className="px-5">
-                <RecentPaymentsSection contractId={activeContract.contractId} />
-              </div>
-            ) : null}
+            <InfoSection
+              tenant={tenant}
+              activeContract={activeContract}
+              activeRoomNumber={activeContract ? roomNumberById[activeContract.roomId] : undefined}
+              period={period}
+              thisMonthPaid={thisMonthPaid}
+              thisMonthRefundedOnly={thisMonthRefunded}
+            />
+            <TenantPaymentsHistorySection
+              contracts={tenantContracts}
+              roomNumberById={roomNumberById}
+            />
             <ContractsSection
               contracts={tenantContracts}
               roomNumberById={roomNumberById}
+              monthPayments={monthPayments}
+              period={period}
               onTerminate={setTerminateTarget}
+              onDeleteContract={setDeleteContractTarget}
+              onAdd={() => setAddContractOpen(true)}
+              onRegisterPayment={(c) => {
+                const roomNumber = roomNumberById[c.roomId]
+                setRegisterTarget({
+                  contractId: c.contractId,
+                  periodYearMonth: period,
+                  defaultAmount: c.monthlyRent,
+                  tenantName: tenant.name,
+                  roomNumber,
+                })
+              }}
+              onRefundPayment={(payment) =>
+                setRefundTarget({
+                  paymentId: payment.id,
+                  periodYearMonth: payment.periodYearMonth,
+                  amount: payment.amount,
+                  defaultNote: payment.note,
+                })
+              }
             />
             <Footer
               activeContract={activeContract}
@@ -154,6 +222,44 @@ export function TenantDetailDrawer({
         variant="danger"
         loading={deleteMutation.isPending}
       />
+
+      <RegisterPaymentDialog
+        target={registerTarget}
+        onClose={() => setRegisterTarget(null)}
+      />
+      <RefundPaymentDialog
+        target={refundTarget}
+        onClose={() => setRefundTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={deleteContractTarget !== null}
+        onClose={() =>
+          deleteContractMutation.isPending ? undefined : setDeleteContractTarget(null)
+        }
+        onConfirm={() => {
+          if (!deleteContractTarget) return
+          deleteContractMutation.mutate(deleteContractTarget.contractId, {
+            onSuccess: () => setDeleteContractTarget(null),
+          })
+        }}
+        title="이 계약을 완전 삭제할까요?"
+        description={
+          deleteContractTarget
+            ? `${roomNumberById[deleteContractTarget.roomId] ?? '계약'}호 · ${deleteContractTarget.startDate} ~ ${deleteContractTarget.endDate} · 결제 내역도 함께 삭제됩니다. 잘못 입력한 계약 복구용으로만 사용하세요.`
+            : undefined
+        }
+        confirmLabel="삭제"
+        variant="danger"
+        loading={deleteContractMutation.isPending}
+      />
+
+      <AddContractDialog
+        tenantId={addContractOpen ? tenant.tenantId : null}
+        tenantName={tenant.name}
+        occupiedRoomIds={occupiedRoomIds}
+        onClose={() => setAddContractOpen(false)}
+      />
     </div>
   )
 }
@@ -188,11 +294,47 @@ function Header({
   )
 }
 
-function InfoSection({ tenant }: { tenant: TenantResponse }) {
+function InfoSection({
+  tenant,
+  activeContract,
+  activeRoomNumber,
+  period,
+  thisMonthPaid,
+  thisMonthRefundedOnly,
+}: {
+  tenant: TenantResponse
+  activeContract: ContractResponse | null
+  activeRoomNumber?: string
+  period: string
+  thisMonthPaid: PaymentResponse | null
+  thisMonthRefundedOnly: boolean
+}) {
   return (
     <section className="flex flex-col gap-2 px-5 py-2">
       <InfoRow label="연락처" value={tenant.phoneNumber} />
       <InfoRow label="메모" value={tenant.memo ?? '—'} />
+
+      <div className="flex items-start justify-between gap-3 py-1.5">
+        <span className="shrink-0 text-sm text-[var(--muted)]">현재 상태</span>
+        <div className="flex flex-wrap justify-end gap-1.5">
+          {activeContract ? (
+            <>
+              <StatusPill tone="emerald">
+                거주중{activeRoomNumber ? ` · ${activeRoomNumber}호` : ''}
+              </StatusPill>
+              {thisMonthPaid ? (
+                <StatusPill tone="emerald">{period} 완납</StatusPill>
+              ) : thisMonthRefundedOnly ? (
+                <StatusPill tone="amber">{period} 환불됨</StatusPill>
+              ) : (
+                <StatusPill tone="rose">{period} 미납</StatusPill>
+              )}
+            </>
+          ) : (
+            <StatusPill tone="slate">퇴실</StatusPill>
+          )}
+        </div>
+      </div>
 
       <div className="mt-2 flex flex-col gap-1 border-t border-[var(--border)] pt-3 text-xs text-[var(--muted)]">
         <div className="flex justify-between">
@@ -205,6 +347,26 @@ function InfoSection({ tenant }: { tenant: TenantResponse }) {
         </div>
       </div>
     </section>
+  )
+}
+
+function StatusPill({
+  tone,
+  children,
+}: {
+  tone: 'emerald' | 'rose' | 'amber' | 'slate'
+  children: React.ReactNode
+}) {
+  const cls = {
+    emerald: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+    rose: 'bg-rose-500/15 text-rose-700 dark:text-rose-300',
+    amber: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+    slate: 'bg-slate-500/15 text-slate-700 dark:text-slate-300',
+  }[tone]
+  return (
+    <span className={['rounded-full px-2 py-0.5 text-[10px] font-semibold', cls].join(' ')}>
+      {children}
+    </span>
   )
 }
 
@@ -222,54 +384,132 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 function ContractsSection({
   contracts,
   roomNumberById,
+  monthPayments,
+  period,
   onTerminate,
+  onDeleteContract,
+  onAdd,
+  onRegisterPayment,
+  onRefundPayment,
 }: {
   contracts: ContractResponse[]
   roomNumberById: Record<string, string>
+  monthPayments: PaymentResponse[]
+  period: string
   onTerminate: (c: ContractResponse) => void
+  onDeleteContract: (c: ContractResponse) => void
+  onAdd: () => void
+  onRegisterPayment: (c: ContractResponse) => void
+  onRefundPayment: (p: PaymentResponse) => void
 }) {
+  const hasActive = contracts.some((c) => c.status === 'ACTIVE')
+
   return (
     <section className="flex flex-col gap-2 border-t border-[var(--border)] px-5 py-3">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-        계약 이력 ({contracts.length})
-      </h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+          계약 이력 ({contracts.length})
+        </h3>
+        {!hasActive ? (
+          <button
+            type="button"
+            onClick={onAdd}
+            className="rounded-md border border-[var(--border)] bg-[var(--control)] px-2 py-1 text-[11px] font-medium text-[var(--foreground)] transition hover:border-[var(--accent)] hover:bg-[var(--control-hover)]"
+          >
+            + 새 계약
+          </button>
+        ) : null}
+      </div>
       {contracts.length === 0 ? (
         <p className="text-xs text-[var(--muted)]">계약 없음</p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {contracts.map((c) => (
-            <li
-              key={c.contractId}
-              className="flex flex-col gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-2"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium">
-                  {roomNumberById[c.roomId] ? `${roomNumberById[c.roomId]}호` : c.roomId.slice(0, 8)}
-                </span>
-                <span className="text-[11px] tabular-nums text-[var(--muted)]">
-                  {formatRelativeContract(c.startDate)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-xs text-[var(--muted)]">
-                <span>
-                  {dateOnlyFmt.format(new Date(c.startDate))} ~{' '}
-                  {dateOnlyFmt.format(new Date(c.endDate))}
-                </span>
-                <span className="tabular-nums">월 {numberFmt.format(c.monthlyRent)}원</span>
-              </div>
-              {c.status === 'ACTIVE' ? (
-                <div className="flex justify-end pt-1">
+          {contracts.map((c) => {
+            const isActive = c.status === 'ACTIVE'
+            const monthPaid = isActive
+              ? monthPayments.find(
+                  (p) => p.contractId === c.contractId && p.status === 'PAID',
+                ) ?? null
+              : null
+            return (
+              <li
+                key={c.contractId}
+                className="flex flex-col gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-2"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium">
+                    {roomNumberById[c.roomId] ? `${roomNumberById[c.roomId]}호` : c.roomId.slice(0, 8)}
+                  </span>
+                  <span className="text-[11px] tabular-nums text-[var(--muted)]">
+                    {formatRelativeContract(c.startDate)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-[var(--muted)]">
+                  <span>
+                    {dateOnlyFmt.format(new Date(c.startDate))} ~{' '}
+                    {dateOnlyFmt.format(new Date(c.endDate))}
+                  </span>
+                  <span className="tabular-nums">월 {numberFmt.format(c.monthlyRent)}원</span>
+                </div>
+                {isActive ? (
+                  <label className="mt-1 flex items-center justify-between gap-2 rounded-md bg-[var(--control)] px-2 py-1.5 text-[11px]">
+                    <span className="text-[var(--muted)]">{period} 입금</span>
+                    <span className="flex items-center gap-2">
+                      <span
+                        className={[
+                          'font-semibold',
+                          monthPaid ? 'text-emerald-600' : 'text-rose-500',
+                        ].join(' ')}
+                      >
+                        {monthPaid ? '완납' : '미납'}
+                      </span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={!!monthPaid}
+                        onClick={() => {
+                          if (monthPaid) {
+                            onRefundPayment(monthPaid)
+                          } else {
+                            onRegisterPayment(c)
+                          }
+                        }}
+                        className={[
+                          'relative inline-flex h-5 w-9 items-center rounded-full transition',
+                          monthPaid ? 'bg-emerald-500' : 'bg-[var(--border)]',
+                        ].join(' ')}
+                      >
+                        <span
+                          className={[
+                            'inline-block h-4 w-4 transform rounded-full bg-white shadow transition',
+                            monthPaid ? 'translate-x-4' : 'translate-x-0.5',
+                          ].join(' ')}
+                        />
+                      </button>
+                    </span>
+                  </label>
+                ) : null}
+                <div className="flex justify-end gap-1.5 pt-1">
+                  {isActive ? (
+                    <button
+                      type="button"
+                      onClick={() => onTerminate(c)}
+                      className="rounded-md border border-rose-500/40 bg-rose-500/5 px-2 py-1 text-[11px] font-medium text-rose-600 transition hover:bg-rose-500/10"
+                    >
+                      퇴실
+                    </button>
+                  ) : null}
                   <button
                     type="button"
-                    onClick={() => onTerminate(c)}
-                    className="rounded-md border border-rose-500/40 bg-rose-500/5 px-2 py-1 text-[11px] font-medium text-rose-600 transition hover:bg-rose-500/10"
+                    onClick={() => onDeleteContract(c)}
+                    className="rounded-md border border-[var(--border)] bg-transparent px-2 py-1 text-[11px] font-medium text-[var(--muted)] transition hover:border-rose-500/40 hover:text-rose-500"
                   >
-                    이 계약 종료
+                    삭제
                   </button>
                 </div>
-              ) : null}
-            </li>
-          ))}
+              </li>
+            )
+          })}
         </ul>
       )}
     </section>
