@@ -1,14 +1,21 @@
 package com.cj.stayops.backend.payment.presentation;
 
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.cj.stayops.backend.payment.application.ListOverdueUseCase;
 import com.cj.stayops.backend.payment.application.RegisterManualPaymentUseCase;
 import com.cj.stayops.backend.payment.application.dto.PaymentResult;
+import com.cj.stayops.backend.payment.domain.model.PeriodYearMonth;
+import com.cj.stayops.backend.payment.presentation.dto.OverduePaymentResponse;
 import com.cj.stayops.backend.payment.presentation.dto.PaymentResponse;
 import com.cj.stayops.backend.payment.presentation.dto.RegisterPaymentRequest;
 
@@ -22,9 +29,12 @@ import jakarta.validation.Valid;
 public class PaymentController {
 
 	private final RegisterManualPaymentUseCase registerManualPaymentUseCase;
+	private final ListOverdueUseCase listOverdueUseCase;
 
-	public PaymentController(RegisterManualPaymentUseCase registerManualPaymentUseCase) {
+	public PaymentController(RegisterManualPaymentUseCase registerManualPaymentUseCase,
+							 ListOverdueUseCase listOverdueUseCase) {
 		this.registerManualPaymentUseCase = registerManualPaymentUseCase;
+		this.listOverdueUseCase = listOverdueUseCase;
 	}
 
 	@PostMapping
@@ -35,5 +45,18 @@ public class PaymentController {
 	) {
 		PaymentResult result = registerManualPaymentUseCase.execute(request.toCommand());
 		return ResponseEntity.status(HttpStatus.CREATED).body(PaymentResponse.from(result));
+	}
+
+	@GetMapping("/overdue")
+	@Operation(summary = "기준월 미납자 목록",
+		description = "ACTIVE 계약 중 해당 월에 PAID 결제 레코드가 없는 계약을 반환합니다.")
+	public ResponseEntity<List<OverduePaymentResponse>> overdue(
+		@RequestParam("period") String period
+	) {
+		PeriodYearMonth periodVo = PeriodYearMonth.of(period);
+		List<OverduePaymentResponse> items = listOverdueUseCase.execute(periodVo).stream()
+			.map(OverduePaymentResponse::from)
+			.toList();
+		return ResponseEntity.ok(items);
 	}
 }
