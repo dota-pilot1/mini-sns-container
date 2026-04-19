@@ -1,6 +1,7 @@
 package com.cj.stayops.backend.room.presentation;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.cj.stayops.backend.auth.presentation.dto.ErrorResponse;
+import com.cj.stayops.backend.config.aws.S3ObjectService;
 import com.cj.stayops.backend.room.application.ChangeRoomStatusUseCase;
 import com.cj.stayops.backend.room.application.CreateRoomUseCase;
 import com.cj.stayops.backend.room.application.DeleteRoomUseCase;
@@ -23,8 +25,10 @@ import com.cj.stayops.backend.room.application.ListRoomsUseCase;
 import com.cj.stayops.backend.room.application.UpdateRoomUseCase;
 import com.cj.stayops.backend.room.application.dto.ListRoomsQuery;
 import com.cj.stayops.backend.room.application.dto.RoomResult;
+import com.cj.stayops.backend.room.domain.model.RoomId;
+import com.cj.stayops.backend.room.domain.model.RoomImage;
 import com.cj.stayops.backend.room.domain.model.RoomStatus;
-import com.cj.stayops.backend.room.domain.model.RoomType;
+import com.cj.stayops.backend.room.domain.repository.RoomImageRepository;
 import com.cj.stayops.backend.room.presentation.dto.ChangeRoomStatusRequest;
 import com.cj.stayops.backend.room.presentation.dto.CreateRoomRequest;
 import com.cj.stayops.backend.room.presentation.dto.RoomResponse;
@@ -52,19 +56,25 @@ public class RoomController {
 	private final GetRoomUseCase getRoomUseCase;
 	private final ListRoomsUseCase listRoomsUseCase;
 	private final DeleteRoomUseCase deleteRoomUseCase;
+	private final RoomImageRepository roomImageRepository;
+	private final S3ObjectService s3ObjectService;
 
 	public RoomController(CreateRoomUseCase createRoomUseCase,
 						  UpdateRoomUseCase updateRoomUseCase,
 						  ChangeRoomStatusUseCase changeRoomStatusUseCase,
 						  GetRoomUseCase getRoomUseCase,
 						  ListRoomsUseCase listRoomsUseCase,
-						  DeleteRoomUseCase deleteRoomUseCase) {
+						  DeleteRoomUseCase deleteRoomUseCase,
+						  RoomImageRepository roomImageRepository,
+						  S3ObjectService s3ObjectService) {
 		this.createRoomUseCase = createRoomUseCase;
 		this.updateRoomUseCase = updateRoomUseCase;
 		this.changeRoomStatusUseCase = changeRoomStatusUseCase;
 		this.getRoomUseCase = getRoomUseCase;
 		this.listRoomsUseCase = listRoomsUseCase;
 		this.deleteRoomUseCase = deleteRoomUseCase;
+		this.roomImageRepository = roomImageRepository;
+		this.s3ObjectService = s3ObjectService;
 	}
 
 	@PostMapping
@@ -83,15 +93,22 @@ public class RoomController {
 	}
 
 	@GetMapping
-	@Operation(summary = "방 목록 조회", description = "필터 조건(층/상태/타입)으로 방 목록을 조회합니다. 삭제된 방은 제외됩니다.")
+	@Operation(summary = "방 목록 조회", description = "필터 조건(층/상태)으로 방 목록을 조회합니다. 삭제된 방은 제외됩니다. 각 항목에 대표 이미지 URL 포함.")
 	public ResponseEntity<List<RoomResponse>> list(
 		@RequestParam(required = false) Integer floor,
-		@RequestParam(required = false) RoomStatus status,
-		@RequestParam(required = false) RoomType roomType
+		@RequestParam(required = false) RoomStatus status
 	) {
-		List<RoomResponse> items = listRoomsUseCase.execute(new ListRoomsQuery(floor, status, roomType))
-			.stream()
-			.map(RoomResponse::from)
+		List<RoomResult> results = listRoomsUseCase.execute(new ListRoomsQuery(floor, status));
+		// 대표 이미지를 한 번에 조회해 N+1 방지.
+		List<RoomId> roomIds = results.stream().map(r -> RoomId.of(r.roomId())).toList();
+		Map<RoomId, RoomImage> primaryByRoomId = roomImageRepository.findPrimaryByRoomIds(roomIds);
+
+		List<RoomResponse> items = results.stream()
+			.map(r -> {
+				RoomImage primary = primaryByRoomId.get(RoomId.of(r.roomId()));
+				String url = primary == null ? null : s3ObjectService.presignGetUrl(primary.s3Key());
+				return RoomResponse.from(r, url);
+			})
 			.toList();
 		return ResponseEntity.ok(items);
 	}

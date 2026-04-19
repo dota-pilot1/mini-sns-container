@@ -1,6 +1,12 @@
 spring:
   application:
     name: stay-ops-server
+  config:
+    # .env 를 properties 형식으로 로드. 두 위치 모두 시도 (모듈 루트 / 워크스페이스 루트).
+    # optional: 접두사로 파일이 없어도 기동 실패하지 않음.
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:stay-ops-server/.env[.properties]
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/stayops}
     username: ${SPRING_DATASOURCE_USERNAME:stayops}
@@ -40,3 +46,15 @@ stay-ops:
   dev:
     # 방이 0개일 때만 60개(6층/7층 각 30개) 시드 데이터 자동 삽입. prod에서는 false로.
     seed-rooms: ${STAY_OPS_SEED_ROOMS:true}
+    # 입주자가 0명일 때만 방 일부에 매핑된 더미 입주자를 삽입. prod에서는 false로.
+    seed-tenants: ${STAY_OPS_SEED_TENANTS:true}
+
+aws:
+  region: ${AWS_S3_REGION:ap-northeast-2}
+  credentials:
+    access-key: ${AWS_ACCESS_KEY_ID:}
+    secret-key: ${AWS_SECRET_ACCESS_KEY:}
+  s3:
+    bucket: ${AWS_S3_BUCKET_NAME:}
+    presign-ttl-seconds: 600
+    max-upload-bytes: 10485760  # 10MB

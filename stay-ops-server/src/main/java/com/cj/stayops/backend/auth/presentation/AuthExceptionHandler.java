@@ -14,10 +14,13 @@ import com.cj.stayops.backend.auth.presentation.dto.ErrorResponse;
 import com.cj.stayops.backend.contract.domain.exception.ContractNotFoundException;
 import com.cj.stayops.backend.contract.domain.exception.InvalidContractFieldException;
 import com.cj.stayops.backend.room.domain.exception.DuplicateRoomNumberException;
+import com.cj.stayops.backend.room.domain.exception.ImageNotUploadedException;
 import com.cj.stayops.backend.room.domain.exception.InvalidRoomFieldException;
+import com.cj.stayops.backend.room.domain.exception.RoomImageNotFoundException;
 import com.cj.stayops.backend.room.domain.exception.RoomNotFoundException;
 import com.cj.stayops.backend.tenant.domain.exception.InvalidTenantFieldException;
 import com.cj.stayops.backend.tenant.domain.exception.TenantNotFoundException;
+import com.cj.stayops.backend.upload.domain.exception.InvalidUploadRequestException;
 import com.cj.stayops.backend.user.domain.exception.DuplicateEmailException;
 import com.cj.stayops.backend.user.domain.exception.InvalidEmailException;
 
@@ -95,6 +98,20 @@ public class AuthExceptionHandler {
 			.body(ErrorResponse.of("ROOM_NOT_FOUND", e.getMessage()));
 	}
 
+	/** 존재하지 않는 방 이미지 → 404 Not Found. */
+	@ExceptionHandler(RoomImageNotFoundException.class)
+	public ResponseEntity<ErrorResponse> handleRoomImageNotFound(RoomImageNotFoundException e) {
+		return ResponseEntity.status(HttpStatus.NOT_FOUND)
+			.body(ErrorResponse.of("ROOM_IMAGE_NOT_FOUND", e.getMessage()));
+	}
+
+	/** S3 에 업로드되지 않은 key 로 등록 시도 → 409 Conflict. */
+	@ExceptionHandler(ImageNotUploadedException.class)
+	public ResponseEntity<ErrorResponse> handleImageNotUploaded(ImageNotUploadedException e) {
+		return ResponseEntity.status(HttpStatus.CONFLICT)
+			.body(ErrorResponse.of("IMAGE_NOT_UPLOADED", e.getMessage()));
+	}
+
 	/** 입주자 필드 도메인 검증 실패 → 400 Bad Request. */
 	@ExceptionHandler(InvalidTenantFieldException.class)
 	public ResponseEntity<ErrorResponse> handleInvalidTenantField(InvalidTenantFieldException e) {
@@ -127,5 +144,15 @@ public class AuthExceptionHandler {
 	public ResponseEntity<ErrorResponse> handleContractNotFound(ContractNotFoundException e) {
 		return ResponseEntity.status(HttpStatus.NOT_FOUND)
 			.body(ErrorResponse.of("CONTRACT_NOT_FOUND", e.getMessage()));
+	}
+
+	/** 업로드 요청 파라미터 오류 → 400 Bad Request. */
+	@ExceptionHandler(InvalidUploadRequestException.class)
+	public ResponseEntity<ErrorResponse> handleInvalidUpload(InvalidUploadRequestException e) {
+		List<ErrorResponse.FieldError> errors = List.of(
+			new ErrorResponse.FieldError(e.field(), e.getMessage())
+		);
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+			.body(ErrorResponse.of("INVALID_UPLOAD_REQUEST", e.getMessage(), errors));
 	}
 }

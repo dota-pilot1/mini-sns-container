@@ -14,7 +14,6 @@ import type { RoomResponse } from '@/features/room/api/room-api'
 import {
   ROOM_OPTION_LABEL,
   ROOM_STATUS_ORDER,
-  ROOM_TYPE_LABEL,
 } from '@/features/room/model/room-types'
 import { RoomBulkActionBar } from '@/features/room/ui/room-bulk-action-bar'
 import { RoomStatusBadge } from '@/features/room/ui/room-status-badge'
@@ -74,6 +73,27 @@ export function RoomTableView({ rooms, onSelect }: Props) {
         size: 40,
         enableSorting: false,
       },
+      {
+        id: 'thumbnail',
+        header: '',
+        cell: ({ row }) => {
+          const url = row.original.primaryImageUrl
+          return (
+            <div className="h-10 w-10 overflow-hidden rounded-md bg-[var(--control)]">
+              {url ? (
+                <img
+                  src={url}
+                  alt=""
+                  loading="lazy"
+                  className="h-full w-full object-cover"
+                />
+              ) : null}
+            </div>
+          )
+        },
+        enableSorting: false,
+        size: 56,
+      },
       ch.accessor('roomNumber', {
         header: '호수',
         cell: (info) => (
@@ -87,11 +107,6 @@ export function RoomTableView({ rooms, onSelect }: Props) {
         header: '층',
         cell: (info) => `${info.getValue()}F`,
         size: 60,
-      }),
-      ch.accessor('roomType', {
-        header: '타입',
-        cell: (info) => ROOM_TYPE_LABEL[info.getValue()],
-        size: 80,
       }),
       ch.accessor('sizePyeong', {
         header: () => <span className="w-full text-right">평수</span>,

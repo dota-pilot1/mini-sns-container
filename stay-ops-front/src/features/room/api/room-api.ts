@@ -3,7 +3,6 @@ import { apiFetch } from '@/shared/api/client'
 import type {
   RoomOption,
   RoomStatus,
-  RoomType,
 } from '@/features/room/model/room-types'
 
 export type RoomResponse = {
@@ -11,12 +10,13 @@ export type RoomResponse = {
   roomNumber: string
   floor: number
   sizePyeong: number
-  roomType: RoomType
   monthlyRent: number
   deposit: number
   status: RoomStatus
   options: RoomOption[]
   memo: string | null
+  /** 목록 응답에선 대표 이미지 presigned URL. 상세/생성/수정 응답에선 null. */
+  primaryImageUrl: string | null
   createdAt: string
   updatedAt: string
 }
@@ -25,7 +25,6 @@ export type CreateRoomPayload = {
   roomNumber: string
   floor: number
   sizePyeong: number
-  roomType: RoomType
   monthlyRent: number
   deposit: number
   options?: RoomOption[]
@@ -37,14 +36,12 @@ export type UpdateRoomPayload = Partial<CreateRoomPayload>
 export type ListRoomsParams = {
   floor?: number
   status?: RoomStatus
-  roomType?: RoomType
 }
 
 function buildQuery(params: ListRoomsParams): string {
   const entries: [string, string][] = []
   if (params.floor !== undefined) entries.push(['floor', String(params.floor)])
   if (params.status) entries.push(['status', params.status])
-  if (params.roomType) entries.push(['roomType', params.roomType])
   if (entries.length === 0) return ''
   const qs = new URLSearchParams(entries).toString()
   return `?${qs}`

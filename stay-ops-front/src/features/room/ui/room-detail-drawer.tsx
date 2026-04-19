@@ -135,6 +135,7 @@ function Header({
   onClose: () => void
   mode: Mode
 }) {
+  const navigate = useNavigate()
   return (
     <header className="flex items-start justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
       <div className="flex flex-col gap-1">
@@ -148,15 +149,31 @@ function Header({
         </div>
         <RoomStatusBadge status={room.status} />
       </div>
-      <button
-        type="button"
-        onClick={onClose}
-        disabled={mode === 'edit'}
-        aria-label="닫기"
-        className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--muted)] transition hover:bg-[var(--control)] hover:text-[var(--foreground)] disabled:opacity-40"
-      >
-        ✕
-      </button>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() =>
+            navigate({
+              to: '/rooms/$roomId',
+              params: { roomId: room.roomId },
+            })
+          }
+          disabled={mode === 'edit'}
+          title="전체 화면으로 보기"
+          className="rounded-lg border border-[var(--border)] bg-[var(--control)] px-2 py-1 text-xs font-medium text-[var(--foreground)] transition hover:border-[var(--accent)] disabled:opacity-40"
+        >
+          전체 화면 →
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={mode === 'edit'}
+          aria-label="닫기"
+          className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--muted)] transition hover:bg-[var(--control)] hover:text-[var(--foreground)] disabled:opacity-40"
+        >
+          ✕
+        </button>
+      </div>
     </header>
   )
 }
