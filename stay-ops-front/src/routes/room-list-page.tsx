@@ -32,6 +32,7 @@ export function RoomListPage() {
   const filter: RoomFilter = {
     floor: search.floor ?? null,
     status: search.status ?? null,
+    paymentStatus: search.paymentStatus ?? null,
   }
   const selectedRoomId = search.selected ?? null
 
@@ -52,6 +53,7 @@ export function RoomListPage() {
     patchSearch({
       floor: next.floor ?? undefined,
       status: next.status ?? undefined,
+      paymentStatus: next.paymentStatus ?? undefined,
     })
   const setSelected = (roomId: string | null) =>
     patchSearch({ selected: roomId ?? undefined })
@@ -63,9 +65,12 @@ export function RoomListPage() {
     return data.filter((r) => {
       if (filter.floor !== null && r.floor !== filter.floor) return false
       if (filter.status !== null && r.status !== filter.status) return false
+      if (filter.paymentStatus !== null) {
+        if (paymentStatusByRoomId[r.roomId] !== filter.paymentStatus) return false
+      }
       return true
     })
-  }, [data, filter])
+  }, [data, filter, paymentStatusByRoomId])
 
   const selectedRoom = useMemo(
     () => (selectedRoomId ? data.find((r) => r.roomId === selectedRoomId) ?? null : null),
@@ -76,6 +81,7 @@ export function RoomListPage() {
     <div className="-mx-4 -my-4 flex min-h-[calc(100svh-3.5rem)] md:-mx-6 md:-my-6">
       <RoomSidebar
         rooms={data}
+        paymentStatusByRoomId={paymentStatusByRoomId}
         filter={filter}
         onChange={setFilter}
         onCreateClick={() => setCreateOpen(true)}
@@ -86,7 +92,7 @@ export function RoomListPage() {
           <div className="flex items-baseline gap-3">
             <h1 className="text-xl font-bold tracking-[-0.03em]">방 관리</h1>
             <span className="text-xs text-[var(--muted)]">
-              {filter.floor === null && filter.status === null
+              {filter.floor === null && filter.status === null && filter.paymentStatus === null
                 ? `총 ${data.length}개`
                 : `${filtered.length} / ${data.length}개`}
             </span>

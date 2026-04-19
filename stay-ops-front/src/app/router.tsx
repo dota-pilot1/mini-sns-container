@@ -72,6 +72,7 @@ export const roomsSearchSchema = z.object({
   view: z.enum(['floor', 'kanban', 'table']).optional().catch(undefined),
   floor: z.coerce.number().int().optional().catch(undefined),
   status: z.enum(ROOM_STATUSES).optional().catch(undefined),
+  paymentStatus: z.enum(['PAID', 'OVERDUE', 'REFUNDED_ONLY']).optional().catch(undefined),
   selected: z.string().optional().catch(undefined),
 })
 
