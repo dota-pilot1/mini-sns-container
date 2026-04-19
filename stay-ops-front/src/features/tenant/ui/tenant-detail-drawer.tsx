@@ -4,6 +4,7 @@ import type { ContractResponse } from '@/features/contract/api/contract-api'
 import { useDeleteContract } from '@/features/contract/model/use-delete-contract'
 import { AddContractDialog } from '@/features/contract/ui/add-contract-dialog'
 import { CancelOccupancyDialog } from '@/features/contract/ui/cancel-occupancy-dialog'
+import { ContractHistoryDialog } from '@/features/contract/ui/contract-history-dialog'
 import { ExtendAndPayDialog } from '@/features/contract/ui/extend-and-pay-dialog'
 import type { PaymentResponse } from '@/features/payment/api/payment-api'
 import { useDeletePayment } from '@/features/payment/model/use-delete-payment'
@@ -52,6 +53,7 @@ export function TenantDetailDrawer({
   const [deleteContractTarget, setDeleteContractTarget] = useState<ContractResponse | null>(null)
   const [addContractOpen, setAddContractOpen] = useState(false)
   const [extendTarget, setExtendTarget] = useState<ContractResponse | null>(null)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   const deleteMutation = useDeleteTenant()
   const updateMutation = useUpdateTenant()
@@ -143,6 +145,7 @@ export function TenantDetailDrawer({
               onExtend={() => {
                 if (activeContract) setExtendTarget(activeContract)
               }}
+              onOpenHistory={() => setHistoryOpen(true)}
               onRegisterPayment={(c) => {
                 const roomNumber = roomNumberById[c.roomId]
                 setRegisterTarget({
@@ -256,6 +259,14 @@ export function TenantDetailDrawer({
         tenantName={tenant.name}
         roomNumber={extendTarget ? roomNumberById[extendTarget.roomId] : undefined}
         onClose={() => setExtendTarget(null)}
+      />
+
+      <ContractHistoryDialog
+        open={historyOpen}
+        tenantName={tenant.name}
+        contracts={tenantContracts}
+        roomNumberById={roomNumberById}
+        onClose={() => setHistoryOpen(false)}
       />
     </div>
   )
@@ -387,6 +398,7 @@ function ContractsSection({
   onDeleteContract,
   onAdd,
   onExtend,
+  onOpenHistory,
   onRegisterPayment,
   onUndoPayment,
 }: {
@@ -398,18 +410,38 @@ function ContractsSection({
   onDeleteContract: (c: ContractResponse) => void
   onAdd: () => void
   onExtend: () => void
+  onOpenHistory: () => void
   onRegisterPayment: (c: ContractResponse) => void
   onUndoPayment: (p: PaymentResponse) => void
 }) {
   const hasActive = contracts.some((c) => c.status === 'ACTIVE')
   const latest = contracts[0] ?? null
+  const hasHistory = contracts.length > 1
 
   return (
     <section className="flex flex-col gap-2 border-t border-[var(--border)] px-5 py-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-          계약
-        </h3>
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+            계약
+          </h3>
+          {hasHistory ? (
+            <button
+              type="button"
+              onClick={onOpenHistory}
+              aria-label={`계약 이력 ${contracts.length}건 보기`}
+              title={`계약 이력 ${contracts.length}건 보기`}
+              className="flex h-5 items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--control)] px-1.5 text-[10px] font-medium text-[var(--muted)] transition hover:border-[var(--accent)] hover:text-[var(--foreground)]"
+            >
+              <svg viewBox="0 0 16 16" aria-hidden="true" className="h-3 w-3 fill-current">
+                <rect x="2" y="3" width="12" height="1.5" rx="0.5" />
+                <rect x="2" y="7.25" width="12" height="1.5" rx="0.5" />
+                <rect x="2" y="11.5" width="12" height="1.5" rx="0.5" />
+              </svg>
+              <span className="tabular-nums">{contracts.length}</span>
+            </button>
+          ) : null}
+        </div>
         <div className="flex items-center gap-1.5">
           {hasActive ? (
             <button
