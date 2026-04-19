@@ -403,7 +403,7 @@ function ExpiringSection({
               onClick={() => onExtend(contract)}
               className="shrink-0 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90"
             >
-              계약 연장
+              계약 추가
             </button>
           </li>
         )

@@ -279,7 +279,7 @@ function TenantsSection({ roomId, roomNumber }: { roomId: string; roomNumber: st
               onClick={() => setExtendTarget(sole)}
               className="rounded-md border border-[var(--border)] bg-[var(--control)] px-2 py-1 text-[11px] font-medium text-[var(--foreground)] transition hover:border-[var(--accent)] hover:bg-[var(--control-hover)]"
             >
-              계약 연장
+              계약 추가
             </button>
             <button
               type="button"
