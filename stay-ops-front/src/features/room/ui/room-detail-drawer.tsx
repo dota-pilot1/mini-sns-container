@@ -1,7 +1,10 @@
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 
+import type { ContractResponse } from '@/features/contract/api/contract-api'
 import { useContractsQuery } from '@/features/contract/model/use-contracts'
+import { usePaymentsQuery } from '@/features/payment/model/use-payments'
+import { PaymentStatusPill } from '@/features/payment/ui/payment-status-pill'
 import type { RoomResponse } from '@/features/room/api/room-api'
 import { useChangeRoomStatus } from '@/features/room/model/use-change-room-status'
 import { useDeleteRoom } from '@/features/room/model/use-delete-room'
@@ -17,6 +20,7 @@ import { RoomStatusBadge } from '@/features/room/ui/room-status-badge'
 import type { TenantResponse } from '@/features/tenant/api/tenant-api'
 import { useTenantsQuery } from '@/features/tenant/model/use-tenants'
 import { ConfirmDialog } from '@/shared/ui/dialog'
+import { StatusPill, type StatusTone } from '@/shared/ui/status-pill'
 
 const krw = new Intl.NumberFormat('ko-KR')
 const dateFmt = new Intl.DateTimeFormat('ko-KR', {
@@ -261,10 +265,11 @@ function TenantsSection({ roomId }: { roomId: string }) {
         <p className="text-xs text-[var(--muted)]">— 배정된 입주자 없음 —</p>
       ) : (
         <ul className="flex flex-col gap-1.5">
-          {linked.map(({ tenant }) => (
-            <TenantRow
+          {linked.map(({ tenant, contract }) => (
+            <ActiveTenantCard
               key={tenant.tenantId}
               tenant={tenant}
+              contract={contract}
               onClick={() => goToTenant(tenant.tenantId)}
             />
           ))}
@@ -274,31 +279,118 @@ function TenantsSection({ roomId }: { roomId: string }) {
   )
 }
 
-function TenantRow({
+type OccupancyState = 'LIVING' | 'UPCOMING' | 'EXPIRED_ACTIVE'
+
+function deriveOccupancy(contract: ContractResponse, today: string): OccupancyState {
+  if (today < contract.startDate) return 'UPCOMING'
+  if (today > contract.endDate) return 'EXPIRED_ACTIVE'
+  return 'LIVING'
+}
+
+const OCCUPANCY_LABEL: Record<OccupancyState, string> = {
+  LIVING: '거주중',
+  UPCOMING: '입주 예정',
+  EXPIRED_ACTIVE: '계약 만료',
+}
+
+const OCCUPANCY_TONE: Record<OccupancyState, StatusTone> = {
+  LIVING: 'emerald',
+  UPCOMING: 'amber',
+  EXPIRED_ACTIVE: 'rose',
+}
+
+function todayLocalISO(): string {
+  const d = new Date()
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
+  return d.toISOString().slice(0, 10)
+}
+
+function thisMonthString(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function daysSince(iso: string): number {
+  const start = new Date(iso)
+  const today = new Date()
+  start.setHours(0, 0, 0, 0)
+  today.setHours(0, 0, 0, 0)
+  return Math.round((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+}
+
+function ActiveTenantCard({
   tenant,
+  contract,
   onClick,
 }: {
   tenant: TenantResponse
+  contract: ContractResponse
   onClick: () => void
 }) {
+  const today = todayLocalISO()
+  const period = thisMonthString()
+  const occupancy = deriveOccupancy(contract, today)
+  const tenureDays = daysSince(contract.startDate)
+
+  const { data: monthPayments = [] } = usePaymentsQuery({
+    contractId: contract.contractId,
+    period,
+  })
+  const paid = monthPayments.find((p) => p.status === 'PAID') ?? null
+  const refundedOnly = !paid && monthPayments.some((p) => p.status === 'REFUNDED')
+  const paymentStatus = paid ? 'PAID' : refundedOnly ? 'REFUNDED_ONLY' : 'OVERDUE'
+
   return (
     <li>
       <button
         type="button"
         onClick={onClick}
-        className="flex w-full items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-2 text-left transition hover:border-[var(--accent)]"
+        className="flex w-full flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-2.5 text-left transition hover:border-[var(--accent)]"
       >
-        <div className="flex flex-col">
-          <span className="text-sm font-semibold tracking-[-0.01em]">
-            {tenant.name}
-          </span>
-          <span className="tabular-nums text-xs text-[var(--muted)]">
-            {tenant.phoneNumber}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold tracking-[-0.01em]">
+              {tenant.name}
+            </span>
+            <span className="tabular-nums text-xs text-[var(--muted)]">
+              {tenant.phoneNumber}
+            </span>
+          </div>
+          <span className="flex flex-wrap justify-end gap-1">
+            <StatusPill tone={OCCUPANCY_TONE[occupancy]}>
+              {OCCUPANCY_LABEL[occupancy]}
+            </StatusPill>
+            <PaymentStatusPill
+              status={paymentStatus}
+              title={`${period} ${paymentStatus === 'PAID' ? '완납' : paymentStatus === 'OVERDUE' ? '미납' : '환불됨'}`}
+            />
           </span>
         </div>
-        <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
-          거주중
-        </span>
+
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 border-t border-[var(--border)] pt-2 text-xs">
+          <dt className="text-[var(--muted)]">계약</dt>
+          <dd className="text-right tabular-nums text-[var(--foreground)]">
+            {contract.startDate} ~ {contract.endDate}
+          </dd>
+          <dt className="text-[var(--muted)]">월세</dt>
+          <dd className="text-right tabular-nums text-[var(--foreground)]">
+            {krw.format(contract.monthlyRent)}원
+          </dd>
+          <dt className="text-[var(--muted)]">보증금</dt>
+          <dd className="text-right tabular-nums text-[var(--foreground)]">
+            {krw.format(contract.deposit)}원
+          </dd>
+          <dt className="text-[var(--muted)]">
+            {occupancy === 'UPCOMING' ? '입주 예정' : '입주'}
+          </dt>
+          <dd className="text-right tabular-nums text-[var(--foreground)]">
+            {occupancy === 'UPCOMING'
+              ? `${-tenureDays}일 후`
+              : tenureDays === 0
+                ? '오늘'
+                : `${tenureDays}일째`}
+          </dd>
+        </dl>
       </button>
     </li>
   )
