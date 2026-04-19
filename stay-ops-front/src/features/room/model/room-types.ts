@@ -7,9 +7,6 @@ export const ROOM_STATUSES = [
 ] as const
 export type RoomStatus = (typeof ROOM_STATUSES)[number]
 
-export const ROOM_TYPES = ['SINGLE', 'DOUBLE', 'FAMILY'] as const
-export type RoomType = (typeof ROOM_TYPES)[number]
-
 export const ROOM_OPTIONS = [
   'AIRCON',
   'PRIVATE_BATH',
@@ -47,12 +44,6 @@ export const ROOM_STATUS_DOT: Record<RoomStatus, string> = {
   OCCUPIED: 'bg-sky-500',
   CLEANING: 'bg-slate-500',
   MAINTENANCE: 'bg-rose-500',
-}
-
-export const ROOM_TYPE_LABEL: Record<RoomType, string> = {
-  SINGLE: '1인실',
-  DOUBLE: '2인실',
-  FAMILY: '가족실',
 }
 
 export const ROOM_OPTION_LABEL: Record<RoomOption, string> = {

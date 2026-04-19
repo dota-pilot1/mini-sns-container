@@ -49,7 +49,6 @@ public class UpdateRoomUseCase {
 			newRoomNumber,
 			command.floor(),
 			command.sizePyeong(),
-			command.roomType(),
 			newRent,
 			newDeposit,
 			command.options(),

@@ -29,12 +29,10 @@ public interface RoomJpaRepository extends JpaRepository<RoomJpaEntity, UUID> {
 		WHERE r.deletedAt IS NULL
 		  AND (:floor IS NULL OR r.floor = :floor)
 		  AND (:status IS NULL OR r.status = :status)
-		  AND (:roomType IS NULL OR r.roomType = :roomType)
 		ORDER BY r.floor DESC, r.roomNumber ASC
 		""")
 	List<RoomJpaEntity> findAllByFilters(
 		@Param("floor") Integer floor,
-		@Param("status") String status,
-		@Param("roomType") String roomType
+		@Param("status") String status
 	);
 }

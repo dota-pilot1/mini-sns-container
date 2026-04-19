@@ -15,7 +15,6 @@ import com.cj.stayops.backend.room.domain.model.RoomId;
 import com.cj.stayops.backend.room.domain.model.RoomNumber;
 import com.cj.stayops.backend.room.domain.model.RoomOption;
 import com.cj.stayops.backend.room.domain.model.RoomStatus;
-import com.cj.stayops.backend.room.domain.model.RoomType;
 import com.cj.stayops.backend.room.domain.repository.RoomRepository;
 
 /**
@@ -53,11 +52,10 @@ public class RoomRepositoryImpl implements RoomRepository {
 	}
 
 	@Override
-	public List<Room> findAll(Integer floor, RoomStatus status, RoomType roomType) {
+	public List<Room> findAll(Integer floor, RoomStatus status) {
 		return jpaRepository.findAllByFilters(
 				floor,
-				status == null ? null : status.name(),
-				roomType == null ? null : roomType.name()
+				status == null ? null : status.name()
 			).stream()
 			.map(this::toDomain)
 			.toList();
@@ -71,7 +69,6 @@ public class RoomRepositoryImpl implements RoomRepository {
 			room.roomNumber().value(),
 			room.floor(),
 			room.sizePyeong(),
-			room.roomType().name(),
 			room.monthlyRent().amount(),
 			room.deposit().amount(),
 			room.status().name(),
@@ -89,7 +86,6 @@ public class RoomRepositoryImpl implements RoomRepository {
 			RoomNumber.of(e.getRoomNumber()),
 			e.getFloor(),
 			e.getSizePyeong(),
-			RoomType.valueOf(e.getRoomType()),
 			Money.of(e.getMonthlyRent(), "monthlyRent"),
 			Money.of(e.getDeposit(), "deposit"),
 			RoomStatus.valueOf(e.getStatus()),

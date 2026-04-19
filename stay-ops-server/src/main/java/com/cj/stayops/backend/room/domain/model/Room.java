@@ -22,6 +22,8 @@ import com.cj.stayops.backend.room.domain.exception.InvalidRoomFieldException;
  * </ul>
  * <p>
  * 수정 연산은 {@code with*} 메서드로 새 인스턴스를 반환한다 (immutable pattern).
+ * <p>
+ * <b>메모:</b> 고시원 현장이 전원 1인실이라 {@code roomType} 개념은 제거됨. 평수/옵션으로 차이를 표현한다.
  */
 public class Room {
 
@@ -33,7 +35,6 @@ public class Room {
 	private final RoomNumber roomNumber;
 	private final int floor;
 	private final BigDecimal sizePyeong;
-	private final RoomType roomType;
 	private final Money monthlyRent;
 	private final Money deposit;
 	private final RoomStatus status;
@@ -44,14 +45,13 @@ public class Room {
 	private final Instant deletedAt; // nullable
 
 	private Room(RoomId id, RoomNumber roomNumber, int floor, BigDecimal sizePyeong,
-				 RoomType roomType, Money monthlyRent, Money deposit, RoomStatus status,
+				 Money monthlyRent, Money deposit, RoomStatus status,
 				 Set<RoomOption> options, String memo,
 				 Instant createdAt, Instant updatedAt, Instant deletedAt) {
 		this.id = Objects.requireNonNull(id, "id");
 		this.roomNumber = Objects.requireNonNull(roomNumber, "roomNumber");
 		this.floor = floor;
 		this.sizePyeong = Objects.requireNonNull(sizePyeong, "sizePyeong");
-		this.roomType = Objects.requireNonNull(roomType, "roomType");
 		this.monthlyRent = Objects.requireNonNull(monthlyRent, "monthlyRent");
 		this.deposit = Objects.requireNonNull(deposit, "deposit");
 		this.status = Objects.requireNonNull(status, "status");
@@ -66,13 +66,13 @@ public class Room {
 	 * 신규 방 등록용 정적 팩토리. 상태는 VACANT 로 시작.
 	 */
 	public static Room register(RoomId id, RoomNumber roomNumber, int floor, BigDecimal sizePyeong,
-								RoomType roomType, Money monthlyRent, Money deposit,
+								Money monthlyRent, Money deposit,
 								Set<RoomOption> options, String memo, Instant now) {
 		validateFloor(floor);
 		validateSize(sizePyeong);
 		validateMemo(memo);
 		return new Room(
-			id, roomNumber, floor, sizePyeong, roomType,
+			id, roomNumber, floor, sizePyeong,
 			monthlyRent, deposit, RoomStatus.VACANT,
 			options, normalizeMemo(memo), now, now, null
 		);
@@ -82,10 +82,10 @@ public class Room {
 	 * Infrastructure Layer 에서 영속 데이터를 도메인으로 복원할 때 사용.
 	 */
 	public static Room reconstitute(RoomId id, RoomNumber roomNumber, int floor, BigDecimal sizePyeong,
-									RoomType roomType, Money monthlyRent, Money deposit,
+									Money monthlyRent, Money deposit,
 									RoomStatus status, Set<RoomOption> options, String memo,
 									Instant createdAt, Instant updatedAt, Instant deletedAt) {
-		return new Room(id, roomNumber, floor, sizePyeong, roomType,
+		return new Room(id, roomNumber, floor, sizePyeong,
 			monthlyRent, deposit, status, options, memo,
 			createdAt, updatedAt, deletedAt);
 	}
@@ -98,7 +98,7 @@ public class Room {
 		if (this.status == newStatus) {
 			return this;
 		}
-		return new Room(id, roomNumber, floor, sizePyeong, roomType,
+		return new Room(id, roomNumber, floor, sizePyeong,
 			monthlyRent, deposit, newStatus, options, memo,
 			createdAt, now, deletedAt);
 	}
@@ -107,7 +107,7 @@ public class Room {
 	 * 여러 필드를 한 번에 수정. 호수 포함. null 인 필드는 기존 값 유지.
 	 */
 	public Room update(RoomNumber newRoomNumber, Integer newFloor, BigDecimal newSize,
-					   RoomType newType, Money newRent, Money newDeposit,
+					   Money newRent, Money newDeposit,
 					   Set<RoomOption> newOptions, String newMemo, Instant now) {
 		ensureNotDeleted();
 		int floorToUse = newFloor == null ? this.floor : newFloor;
@@ -125,7 +125,6 @@ public class Room {
 			newRoomNumber == null ? this.roomNumber : newRoomNumber,
 			floorToUse,
 			sizeToUse,
-			newType == null ? this.roomType : newType,
 			newRent == null ? this.monthlyRent : newRent,
 			newDeposit == null ? this.deposit : newDeposit,
 			this.status,
@@ -141,7 +140,7 @@ public class Room {
 		if (isDeleted()) {
 			return this;
 		}
-		return new Room(id, roomNumber, floor, sizePyeong, roomType,
+		return new Room(id, roomNumber, floor, sizePyeong,
 			monthlyRent, deposit, status, options, memo,
 			createdAt, now, now);
 	}
@@ -190,7 +189,6 @@ public class Room {
 	public RoomNumber roomNumber() { return roomNumber; }
 	public int floor() { return floor; }
 	public BigDecimal sizePyeong() { return sizePyeong; }
-	public RoomType roomType() { return roomType; }
 	public Money monthlyRent() { return monthlyRent; }
 	public Money deposit() { return deposit; }
 	public RoomStatus status() { return status; }

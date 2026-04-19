@@ -43,7 +43,6 @@ public class CreateRoomUseCase {
 			roomNumber,
 			command.floor(),
 			command.sizePyeong(),
-			command.roomType(),
 			rent,
 			deposit,
 			command.options(),

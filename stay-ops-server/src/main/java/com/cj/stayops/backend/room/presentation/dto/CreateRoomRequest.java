@@ -6,7 +6,6 @@ import java.util.Set;
 
 import com.cj.stayops.backend.room.application.dto.CreateRoomCommand;
 import com.cj.stayops.backend.room.domain.model.RoomOption;
-import com.cj.stayops.backend.room.domain.model.RoomType;
 
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
@@ -19,7 +18,6 @@ public record CreateRoomRequest(
 	@NotBlank @Size(max = 10) String roomNumber,
 	@NotNull @Min(-5) @Max(50) Integer floor,
 	@NotNull @DecimalMin(value = "0.1") BigDecimal sizePyeong,
-	@NotNull RoomType roomType,
 	@NotNull @Min(0) Long monthlyRent,
 	@NotNull @Min(0) Long deposit,
 	Set<RoomOption> options,
@@ -31,7 +29,6 @@ public record CreateRoomRequest(
 			roomNumber,
 			floor,
 			sizePyeong,
-			roomType,
 			monthlyRent,
 			deposit,
 			opts,

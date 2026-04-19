@@ -20,7 +20,7 @@ public class ListRoomsUseCase {
 
 	@Transactional(readOnly = true)
 	public List<RoomResult> execute(ListRoomsQuery query) {
-		return roomRepository.findAll(query.floor(), query.status(), query.roomType())
+		return roomRepository.findAll(query.floor(), query.status())
 			.stream()
 			.map(RoomResult::from)
 			.toList();

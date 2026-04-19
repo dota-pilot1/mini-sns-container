@@ -35,9 +35,6 @@ public class RoomJpaEntity {
 	@Column(name = "size_pyeong", nullable = false, precision = 4, scale = 1)
 	private BigDecimal sizePyeong;
 
-	@Column(name = "room_type", nullable = false, length = 20)
-	private String roomType;
-
 	@Column(name = "monthly_rent", nullable = false)
 	private long monthlyRent;
 
@@ -67,14 +64,13 @@ public class RoomJpaEntity {
 	}
 
 	public RoomJpaEntity(UUID id, String roomNumber, int floor, BigDecimal sizePyeong,
-						 String roomType, long monthlyRent, long deposit, String status,
+						 long monthlyRent, long deposit, String status,
 						 String optionsCsv, String memo,
 						 Instant createdAt, Instant updatedAt, Instant deletedAt) {
 		this.id = id;
 		this.roomNumber = roomNumber;
 		this.floor = floor;
 		this.sizePyeong = sizePyeong;
-		this.roomType = roomType;
 		this.monthlyRent = monthlyRent;
 		this.deposit = deposit;
 		this.status = status;
@@ -89,7 +85,6 @@ public class RoomJpaEntity {
 	public String getRoomNumber() { return roomNumber; }
 	public int getFloor() { return floor; }
 	public BigDecimal getSizePyeong() { return sizePyeong; }
-	public String getRoomType() { return roomType; }
 	public long getMonthlyRent() { return monthlyRent; }
 	public long getDeposit() { return deposit; }
 	public String getStatus() { return status; }

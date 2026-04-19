@@ -8,14 +8,12 @@ import java.util.Set;
 import com.cj.stayops.backend.room.domain.model.Room;
 import com.cj.stayops.backend.room.domain.model.RoomOption;
 import com.cj.stayops.backend.room.domain.model.RoomStatus;
-import com.cj.stayops.backend.room.domain.model.RoomType;
 
 public record RoomResult(
 	String roomId,
 	String roomNumber,
 	int floor,
 	BigDecimal sizePyeong,
-	RoomType roomType,
 	long monthlyRent,
 	long deposit,
 	RoomStatus status,
@@ -30,7 +28,6 @@ public record RoomResult(
 			room.roomNumber().value(),
 			room.floor(),
 			room.sizePyeong(),
-			room.roomType(),
 			room.monthlyRent().amount(),
 			room.deposit().amount(),
 			room.status(),

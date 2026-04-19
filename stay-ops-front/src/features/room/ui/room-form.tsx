@@ -10,10 +10,7 @@ import type {
 import {
   ROOM_OPTIONS,
   ROOM_OPTION_LABEL,
-  ROOM_TYPES,
-  ROOM_TYPE_LABEL,
   type RoomOption,
-  type RoomType,
 } from '@/features/room/model/room-types'
 import { ApiError } from '@/shared/api/types'
 
@@ -34,7 +31,6 @@ const roomFormSchema = z.object({
   sizePyeong: z.coerce
     .number({ message: '평수는 숫자여야 합니다.' })
     .positive('평수는 0보다 커야 합니다.'),
-  roomType: z.enum(ROOM_TYPES),
   monthlyRent: z.coerce
     .number({ message: '월세는 숫자여야 합니다.' })
     .int('월세는 정수여야 합니다.')
@@ -72,7 +68,6 @@ export function RoomForm({
         roomNumber: initial.roomNumber,
         floor: initial.floor,
         sizePyeong: initial.sizePyeong,
-        roomType: initial.roomType,
         monthlyRent: initial.monthlyRent,
         deposit: initial.deposit,
         options: [...initial.options],
@@ -80,10 +75,9 @@ export function RoomForm({
       }
     : {
         roomNumber: '',
-        floor: 1,
-        sizePyeong: 2.5,
-        roomType: 'SINGLE',
-        monthlyRent: 300000,
+        floor: 6,
+        sizePyeong: 2.8,
+        monthlyRent: 380000,
         deposit: 1000000,
         options: ['AIRCON', 'WINDOW'],
         memo: '',
@@ -102,7 +96,6 @@ export function RoomForm({
     defaultValues,
   })
 
-  // 다른 방으로 전환될 때 폼 리셋
   useEffect(() => {
     reset(defaultValues)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -113,7 +106,6 @@ export function RoomForm({
       roomNumber: values.roomNumber.trim().toUpperCase(),
       floor: values.floor,
       sizePyeong: values.sizePyeong,
-      roomType: values.roomType,
       monthlyRent: values.monthlyRent,
       deposit: values.deposit,
       options: values.options,
@@ -139,12 +131,10 @@ export function RoomForm({
           return
         }
         if (err.code === 'INVALID_ROOM_FIELD') {
-          // field 정보가 top-level errors 로 오면 위에서 처리. 그 외는 roomNumber 로 대체 표시
           setError('roomNumber', { type: 'server', message: err.message })
           return
         }
       }
-      // 알 수 없는 에러는 호출부가 처리 (상위 try/catch 로 re-throw)
       throw err
     }
   })
@@ -165,15 +155,6 @@ export function RoomForm({
             {...register('floor')}
             className={inputCls}
           />
-        </Field>
-        <Field label="타입" error={errors.roomType?.message}>
-          <select {...register('roomType')} className={inputCls}>
-            {ROOM_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {ROOM_TYPE_LABEL[t]}
-              </option>
-            ))}
-          </select>
         </Field>
         <Field label="평수" error={errors.sizePyeong?.message}>
           <input
@@ -288,12 +269,4 @@ function Field({
       ) : null}
     </label>
   )
-}
-
-/**
- * UI 가 문자열 roomType 을 union 으로 좁히지 못할 때 대비한 런타임 가드
- * (실제로는 select value 가 ROOM_TYPES 라 안 쓰이지만 보존).
- */
-export function isRoomType(v: string): v is RoomType {
-  return (ROOM_TYPES as readonly string[]).includes(v)
 }
