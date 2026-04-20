@@ -14,6 +14,7 @@ public record ContractResponse(
 	long monthlyRent,
 	long deposit,
 	String previousContractId,
+	LocalDate cancelledAt,
 	Instant createdAt,
 	Instant updatedAt
 ) {
@@ -23,6 +24,7 @@ public record ContractResponse(
 			r.startDate(), r.endDate(),
 			r.monthlyRent(), r.deposit(),
 			r.previousContractId(),
+			r.cancelledAt(),
 			r.createdAt(), r.updatedAt()
 		);
 	}

@@ -14,6 +14,7 @@ public record ContractResult(
 	long monthlyRent,
 	long deposit,
 	String previousContractId,
+	LocalDate cancelledAt,
 	Instant createdAt,
 	Instant updatedAt
 ) {
@@ -27,6 +28,7 @@ public record ContractResult(
 			c.monthlyRent(),
 			c.deposit(),
 			c.previousContractId() == null ? null : c.previousContractId().asString(),
+			c.cancelledAt(),
 			c.createdAt(),
 			c.updatedAt()
 		);

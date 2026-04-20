@@ -60,6 +60,7 @@ public class ContractRepositoryImpl implements ContractRepository {
 			c.monthlyRent(),
 			c.deposit(),
 			c.previousContractId() == null ? null : c.previousContractId().value(),
+			c.cancelledAt(),
 			c.deletedAt(),
 			c.createdAt(),
 			c.updatedAt()
@@ -76,6 +77,7 @@ public class ContractRepositoryImpl implements ContractRepository {
 			e.getMonthlyRent(),
 			e.getDeposit(),
 			e.getPreviousContractId() == null ? null : ContractId.of(e.getPreviousContractId()),
+			e.getCancelledAt(),
 			e.getDeletedAt(),
 			e.getCreatedAt(),
 			e.getUpdatedAt()

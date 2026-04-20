@@ -72,7 +72,7 @@ export function CancelOccupancyDialog({
   )
 
   const cancelable = useMemo(
-    () => sortedChain.filter((c) => deriveContractState(c) !== 'PAST'),
+    () => sortedChain.filter((c) => deriveContractState(c) !== 'CANCELLED'),
     [sortedChain],
   )
 
@@ -95,14 +95,20 @@ export function CancelOccupancyDialog({
     { enabled: open && !!contract },
   )
 
+  const selectedState = contract ? deriveContractState(contract) : null
+
   useEffect(() => {
     if (!open || !contract) return
     const today = todayLocalISO()
+    // UPCOMING: 아직 시작 안 함 → startDate
+    // OVERDUE: endDate 지남 → today (실제 퇴실일)
+    // EFFECTIVE: today
     if (today < contract.startDate) setMoveOutDate(contract.startDate)
-    else if (today > contract.endDate) setMoveOutDate(contract.endDate)
     else setMoveOutDate(today)
-    setRefundDeposit(false)
+    // OVERDUE 는 이미 종료된 계약이라 보증금 환불이 주된 작업 → 기본 ON
+    setRefundDeposit(selectedState === 'OVERDUE')
     setError(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, contract])
 
   const paidOnly = useMemo(
@@ -153,18 +159,20 @@ export function CancelOccupancyDialog({
   }
 
   const running = cancelMutation.isPending
+  const dialogTitle = selectedState === 'OVERDUE' ? '퇴실 처리' : '계약 취소'
+  const submitLabel = selectedState === 'OVERDUE' ? '퇴실 처리' : '계약 취소'
 
   return (
     <Dialog
       open={open}
       onClose={() => (running ? undefined : onClose())}
-      ariaLabel="계약 취소"
+      ariaLabel={dialogTitle}
       maxWidth="max-w-3xl"
       closeOnBackdrop={false}
     >
       <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
         <div className="flex flex-col gap-0.5">
-          <h2 className="text-base font-bold tracking-[-0.02em]">계약 취소</h2>
+          <h2 className="text-base font-bold tracking-[-0.02em]">{dialogTitle}</h2>
           <p className="text-xs text-[var(--muted)]">
             {tenantName}
             {roomNumber ? ` · ${roomNumber}호` : ''}
@@ -195,7 +203,7 @@ export function CancelOccupancyDialog({
             <ul className="flex max-h-[340px] flex-col gap-1.5 overflow-y-auto pr-1">
               {sortedChain.map((c) => {
                 const state = deriveContractState(c)
-                const disabled = state === 'PAST'
+                const disabled = state === 'CANCELLED'
                 const isSelected = contract?.contractId === c.contractId
                 return (
                   <li key={c.contractId}>
@@ -223,14 +231,18 @@ export function CancelOccupancyDialog({
                               ? 'bg-emerald-500/15 text-emerald-600'
                               : state === 'UPCOMING'
                                 ? 'bg-amber-500/15 text-amber-600'
-                                : 'bg-slate-500/15 text-slate-500',
+                                : state === 'OVERDUE'
+                                  ? 'bg-rose-500/15 text-rose-600'
+                                  : 'bg-slate-500/15 text-slate-500',
                           ].join(' ')}
                         >
                           {state === 'EFFECTIVE'
                             ? '거주중'
                             : state === 'UPCOMING'
                               ? '예정'
-                              : '지남'}
+                              : state === 'OVERDUE'
+                                ? '연체'
+                                : '퇴실'}
                         </span>
                       </div>
                       <div className="flex items-center justify-between tabular-nums text-[var(--muted)]">
@@ -406,7 +418,7 @@ export function CancelOccupancyDialog({
             disabled={running || !contract}
             className="rounded-lg bg-rose-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:opacity-60"
           >
-            {running ? '처리 중…' : '계약 취소'}
+            {running ? '처리 중…' : submitLabel}
           </button>
         </div>
       </div>

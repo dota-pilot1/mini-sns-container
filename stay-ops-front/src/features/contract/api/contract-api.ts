@@ -9,6 +9,7 @@ export type ContractResponse = {
   monthlyRent: number
   deposit: number
   previousContractId: string | null
+  cancelledAt: string | null
   createdAt: string
   updatedAt: string
 }

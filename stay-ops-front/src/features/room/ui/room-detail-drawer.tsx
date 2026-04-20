@@ -269,7 +269,12 @@ function TenantsSection({ roomId, roomNumber }: { roomId: string; roomNumber: st
       chain: ContractResponse[]
     }[] = []
     for (const [tenantId, arr] of byTenant) {
-      const current = arr.find((c) => today >= c.startDate && today <= c.endDate)
+      // 취소되지 않은 계약 중 이미 시작된(startDate <= today) 계약. EFFECTIVE 나 OVERDUE
+      // 모두 "이 방에 현재 있는 사람" 으로 취급 — OVERDUE 도 관리자가 퇴실 처리 해야 끝남.
+      const nonCancelledStarted = arr
+        .filter((c) => !c.cancelledAt && c.startDate <= today)
+        .sort((a, b) => b.startDate.localeCompare(a.startDate))
+      const current = nonCancelledStarted[0]
       if (!current) continue
       const tenant = byId.get(tenantId)
       if (!tenant) continue
@@ -294,19 +299,19 @@ function TenantsSection({ roomId, roomNumber }: { roomId: string; roomNumber: st
     <section className="border-t border-[var(--border)] px-5 pt-4">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-          현재 입주자
+          현재 방 사용자
         </h3>
         {sole ? (
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() =>
                 setHistoryTarget({ tenant: sole.tenant, chain: sole.chain })
               }
-              title={`계약 목록 (${sole.chain.length}건)`}
-              className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--control)] px-2 py-1 text-[11px] font-medium text-[var(--foreground)] transition hover:border-[var(--accent)] hover:bg-[var(--control-hover)]"
+              title="계약 목록"
+              className="inline-flex items-center gap-0.5 rounded-md border border-[var(--border)] bg-[var(--control)] px-1.5 py-1 text-[11px] font-medium text-[var(--foreground)] transition hover:border-[var(--accent)] hover:bg-[var(--control-hover)]"
             >
-              계약 목록
+              목록
               <span className="tabular-nums text-[var(--muted)]">
                 {sole.chain.length}
               </span>
@@ -314,18 +319,31 @@ function TenantsSection({ roomId, roomNumber }: { roomId: string; roomNumber: st
             <button
               type="button"
               onClick={() => setExtendTarget(sole)}
-              className="rounded-md border border-[var(--border)] bg-[var(--control)] px-2 py-1 text-[11px] font-medium text-[var(--foreground)] transition hover:border-[var(--accent)] hover:bg-[var(--control-hover)]"
+              title="계약 추가"
+              className="rounded-md border border-[var(--border)] bg-[var(--control)] px-1.5 py-1 text-[11px] font-medium text-[var(--foreground)] transition hover:border-[var(--accent)] hover:bg-[var(--control-hover)]"
             >
-              계약 추가
+              + 추가
             </button>
             <button
               type="button"
               onClick={() =>
                 setCancelTarget({ tenant: sole.tenant, chain: sole.chain })
               }
-              className="rounded-md border border-rose-500/40 bg-rose-500/5 px-2 py-1 text-[11px] font-medium text-rose-600 transition hover:bg-rose-500/10"
+              title={
+                deriveOccupancy(sole.contract, todayLocalISO()) === 'OVERDUE'
+                  ? '퇴실 처리'
+                  : '계약 취소'
+              }
+              className={[
+                'rounded-md px-1.5 py-1 text-[11px] font-medium transition',
+                deriveOccupancy(sole.contract, todayLocalISO()) === 'OVERDUE'
+                  ? 'bg-rose-500 text-white hover:bg-rose-600'
+                  : 'border border-rose-500/40 bg-rose-500/5 text-rose-600 hover:bg-rose-500/10',
+              ].join(' ')}
             >
-              계약 취소
+              {deriveOccupancy(sole.contract, todayLocalISO()) === 'OVERDUE'
+                ? '퇴실 처리'
+                : '취소'}
             </button>
           </div>
         ) : null}
@@ -370,24 +388,24 @@ function TenantsSection({ roomId, roomNumber }: { roomId: string; roomNumber: st
   )
 }
 
-type OccupancyState = 'LIVING' | 'UPCOMING' | 'EXPIRED_ACTIVE'
+type OccupancyState = 'LIVING' | 'UPCOMING' | 'OVERDUE'
 
 function deriveOccupancy(contract: ContractResponse, today: string): OccupancyState {
   if (today < contract.startDate) return 'UPCOMING'
-  if (today > contract.endDate) return 'EXPIRED_ACTIVE'
+  if (today > contract.endDate) return 'OVERDUE'
   return 'LIVING'
 }
 
 const OCCUPANCY_LABEL: Record<OccupancyState, string> = {
   LIVING: '거주중',
   UPCOMING: '입주 예정',
-  EXPIRED_ACTIVE: '계약 만료',
+  OVERDUE: '연체',
 }
 
 const OCCUPANCY_TONE: Record<OccupancyState, StatusTone> = {
   LIVING: 'emerald',
   UPCOMING: 'amber',
-  EXPIRED_ACTIVE: 'rose',
+  OVERDUE: 'rose',
 }
 
 function todayLocalISO(): string {
@@ -399,6 +417,12 @@ function todayLocalISO(): string {
 function thisMonthString(): string {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+/** "2026-04" → "4월". */
+function monthLabel(period: string): string {
+  const m = Number(period.slice(5, 7))
+  return `${m}월`
 }
 
 function daysSince(iso: string): number {
@@ -448,11 +472,14 @@ function ActiveTenantCard({
             </span>
           </div>
           <span className="flex flex-wrap justify-end gap-1">
-            <StatusPill tone={OCCUPANCY_TONE[occupancy]}>
-              {OCCUPANCY_LABEL[occupancy]}
-            </StatusPill>
+            {occupancy === 'LIVING' ? null : (
+              <StatusPill tone={OCCUPANCY_TONE[occupancy]}>
+                {OCCUPANCY_LABEL[occupancy]}
+              </StatusPill>
+            )}
             <PaymentStatusPill
               status={paymentStatus}
+              periodLabel={monthLabel(period)}
               title={`${period} ${paymentStatus === 'PAID' ? '완납' : paymentStatus === 'OVERDUE' ? '미납' : '환불됨'}`}
             />
           </span>

@@ -26,10 +26,14 @@ public interface ContractJpaRepository extends JpaRepository<ContractJpaEntity, 
 		@Param("roomId") UUID roomId
 	);
 
-	/** 주어진 날짜에 유효한(startDate ≤ date ≤ endDate) 소프트 삭제되지 않은 계약. */
+	/**
+	 * 주어진 날짜에 유효한(startDate ≤ date ≤ endDate) 소프트 삭제되지 않은 계약.
+	 * 퇴실 처리된(cancelledAt IS NOT NULL) 계약은 제외.
+	 */
 	@Query("""
 		SELECT c FROM ContractJpaEntity c
 		WHERE c.deletedAt IS NULL
+		  AND c.cancelledAt IS NULL
 		  AND c.startDate <= :asOf
 		  AND c.endDate >= :asOf
 		  AND (:tenantId IS NULL OR c.tenantId = :tenantId)

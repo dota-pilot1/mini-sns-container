@@ -203,14 +203,18 @@ export function ExtendAndPayDialog({
                             ? 'bg-emerald-500/15 text-emerald-600'
                             : state === 'UPCOMING'
                               ? 'bg-amber-500/15 text-amber-600'
-                              : 'bg-slate-500/15 text-slate-500',
+                              : state === 'OVERDUE'
+                                ? 'bg-rose-500/15 text-rose-600'
+                                : 'bg-slate-500/15 text-slate-500',
                         ].join(' ')}
                       >
                         {state === 'EFFECTIVE'
                           ? '거주중'
                           : state === 'UPCOMING'
                             ? '예정'
-                            : '지남'}
+                            : state === 'OVERDUE'
+                              ? '연체'
+                              : '퇴실'}
                       </span>
                     </div>
                     <div className="flex items-center justify-between tabular-nums text-[var(--muted)]">

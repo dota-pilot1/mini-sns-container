@@ -17,12 +17,16 @@ type Props = {
   status: RoomPaymentStatus
   /** 보조 텍스트 (예: "2026-04 완납"). */
   title?: string
+  /** 라벨 앞에 붙는 기간 표시 (예: "4월"). 주면 "4월 완납" 형태로 노출. */
+  periodLabel?: string
 }
 
-export function PaymentStatusPill({ status, title }: Props) {
+export function PaymentStatusPill({ status, title, periodLabel }: Props) {
+  const baseLabel = LABEL[status]
+  const text = periodLabel ? `${periodLabel} ${baseLabel}` : baseLabel
   return (
-    <StatusPill tone={TONE[status]} title={title ?? LABEL[status]}>
-      {LABEL[status]}
+    <StatusPill tone={TONE[status]} title={title ?? text}>
+      {text}
     </StatusPill>
   )
 }
