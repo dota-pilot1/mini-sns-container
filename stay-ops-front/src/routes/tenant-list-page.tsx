@@ -201,9 +201,11 @@ export function TenantListPage() {
   const filteredActiveEntries = useMemo(() => {
     if (activeDdayFilter === null) return activeEntries
     return activeEntries.filter((e) => {
-      // UPCOMING 은 아직 시작도 안 했으니 만료 임박 필터에서 제외
-      if (e.upcoming) return false
-      const d = daysUntil(e.contract.endDate)
+      // UPCOMING: 입주 시작까지 남은 일수 / EFFECTIVE: 계약 만료까지 남은 일수
+      // 둘 다 카드에 D-N 으로 표시되는 값이라 동일 임계치로 필터
+      const d = e.upcoming
+        ? daysUntil(e.contract.startDate)
+        : daysUntil(e.contract.endDate)
       return d >= 0 && d <= activeDdayFilter
     })
   }, [activeEntries, activeDdayFilter])
@@ -284,7 +286,7 @@ export function TenantListPage() {
                     className={[
                       'rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition',
                       active
-                        ? 'border-emerald-500 bg-emerald-500 text-white'
+                        ? 'border-emerald-600 bg-emerald-500 text-white'
                         : 'border-[var(--border)] bg-[var(--control)] text-[var(--muted)] hover:border-emerald-500/60',
                     ].join(' ')}
                   >
